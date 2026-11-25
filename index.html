@@ -1153,7 +1153,7 @@
         "O": "🌙 24/5 NIGHT",
         "C": "🔒 Closed"
       };
-      return map[mp] || "";
+      return map[mp] || "🔒 Closed";
     }
 
     function formatNum(num) {
@@ -1180,9 +1180,7 @@
         let extraTag = "";
         let subText = "";
         if (asset.type === "STOCK") {
-          extraTag = formatSession(d.mp)
-            ? `<span class="tag" id="tag-${key}">${formatSession(d.mp)}</span>`
-            : `<span class="tag" id="tag-${key}" style="display:none"></span>`;
+          extraTag = `<span class="tag" id="tag-${key}">${formatSession(d.mp)}</span>`;
           subText = d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks";
         } else if (asset.type === "PERP") {
           extraTag = `<span class="tag perp-tag">24H Perp</span>`;
@@ -1264,12 +1262,9 @@
       if (d.pc && prevEl) prevEl.textContent = "Prev: $" + formatNum(d.pc);
       if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
 
-      if (d.mp && tagEl) {
-        const sText = formatSession(d.mp);
-        if (sText) {
-          tagEl.style.display = "inline-block";
-          tagEl.textContent = sText;
-        }
+      if (tagEl) {
+        tagEl.style.display = "inline-block";
+        tagEl.textContent = formatSession(d.mp);
       }
 
       if (badgeEl && d.chg !== undefined && !isNaN(parseFloat(d.chg))) {
