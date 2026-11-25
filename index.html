@@ -1384,28 +1384,64 @@
       };
     }
 
+    async function fetchPerpSnapshot(perpSyms) {
+      try {
+        const res = await fetch("https://fapi.binance.com/fapi/v1/ticker/24hr");
+        if (!res.ok) return;
+        const allTickers = await res.json();
+        const wanted = new Set(perpSyms.map(s => s.toUpperCase()));
+
+        allTickers.forEach(item => {
+          if (!wanted.has(item.symbol)) return;
+          const key = `PERP:${item.symbol}`;
+          const prevPrice = marketData[key]?.price;
+          const closePrice = parseFloat(item.lastPrice);
+          const chg = parseFloat(item.priceChangePercent);
+          if (!isNaN(closePrice)) {
+            marketData[key] = {
+              ...marketData[key],
+              price: closePrice,
+              chg: !isNaN(chg) ? chg : (marketData[key]?.chg ?? 0)
+            };
+            updateRowUI(key, prevPrice);
+          }
+        });
+        scheduleSaveMarketCache();
+      } catch (e) {}
+    }
+
     function connectPerp() {
-      if (perpSocket) perpSocket.close();
+      if (perpSocket) {
+        perpSocket.onclose = null;
+        perpSocket.close();
+      }
       clearTimeout(perpTimer);
-      const perpSyms = assets.filter(a => a.type === "PERP").map(a => a.sym.toLowerCase());
+      const perpSyms = assets.filter(a => a.type === "PERP").map(a => a.sym.toUpperCase());
       if (!perpSyms.length) return updateStatus();
 
-      const streams = perpSyms.map(s => `${s}@miniTicker`).join("/");
+      fetchPerpSnapshot(perpSyms);
+
+      const streams = perpSyms.map(s => `${s.toLowerCase()}@miniTicker`).join("/");
       perpSocket = new WebSocket(`wss://fstream.binance.com/stream?streams=${streams}`);
 
       perpSocket.onopen = () => updateStatus();
       perpSocket.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        const d = msg.data;
+        const d = msg.data || msg;
         if (!d || !d.s) return;
-        const key = `PERP:${d.s}`;
+        const sym = String(d.s).toUpperCase();
+        const key = `PERP:${sym}`;
         const prevPrice = marketData[key]?.price;
         const closePrice = parseFloat(d.c);
         const openPrice = parseFloat(d.o);
-        const chg = openPrice ? ((closePrice - openPrice) / openPrice) * 100 : 0;
+        if (isNaN(closePrice)) return;
+        const chg = openPrice ? ((closePrice - openPrice) / openPrice) * 100 : (marketData[key]?.chg ?? 0);
         marketData[key] = { ...marketData[key], price: closePrice, chg };
         updateRowUI(key, prevPrice);
         scheduleSaveMarketCache();
+      };
+      perpSocket.onerror = () => {
+        updateStatus();
       };
       perpSocket.onclose = () => {
         updateStatus();
