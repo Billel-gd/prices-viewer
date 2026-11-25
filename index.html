@@ -85,9 +85,9 @@
       padding: 12px; margin-bottom: 14px; display: none;
     }
     .panel.show { display: block; }
-    .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
     .tab-btn {
-      flex: 1; padding: 7px; border-radius: 6px; border: 1px solid var(--border);
+      flex: 1; min-width: 72px; padding: 7px; border-radius: 6px; border: 1px solid var(--border);
       background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer;
     }
     .tab-btn.active { background: var(--accent); color: #161a1e; border-color: var(--accent); }
@@ -111,6 +111,12 @@
     .alert-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
     .st-active { background: rgba(240, 185, 11, 0.16); color: var(--accent); }
     .st-done { background: rgba(14, 203, 129, 0.16); color: var(--green); }
+
+    .backup-box {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.6;
+    }
+    .backup-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
     .table-head {
       display: grid; grid-template-columns: 1.35fr 1.05fr 0.95fr;
@@ -244,6 +250,7 @@
       <button class="btn btn-accent" onclick="openPanel('asset')">+ إضافة</button>
       <button class="btn" onclick="openPanel('portfolio')">💼 محفظة</button>
       <button class="btn" onclick="openPanel('alert')">🔔 تنبيه</button>
+      <button class="btn" onclick="openPanel('backup')">💾 نسخ احتياطي</button>
       <button class="btn" onclick="openTvModal('BINANCE:BTCUSDT', 'CRYPTO')">📈 شارت TV</button>
       <button class="btn" id="editBtn" onclick="toggleEdit()">تعديل / ترتيب</button>
       <button class="btn" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
@@ -265,6 +272,7 @@
       <button class="tab-btn active" id="tabAsset" onclick="switchTab('asset')">إضافة أصل</button>
       <button class="tab-btn" id="tabPortfolio" onclick="switchTab('portfolio')">المحفظة P&L</button>
       <button class="tab-btn" id="tabAlert" onclick="switchTab('alert')">التنبيهات</button>
+      <button class="tab-btn" id="tabBackup" onclick="switchTab('backup')">نسخ احتياطي</button>
     </div>
 
     <div id="viewAsset">
@@ -318,6 +326,16 @@
           <span id="alertsCount">0</span>
         </div>
         <div class="sub-list" id="alertList"></div>
+      </div>
+    </div>
+
+    <div id="viewBackup" style="display:none;">
+      <div style="font-size:12px; color:var(--muted);">صدّر بياناتك (قائمة المراقبة، المحفظة، التنبيهات، الإعدادات) إلى ملف JSON لحفظها أو نقلها لجهاز آخر:</div>
+      <div class="backup-box" id="backupStatsText"></div>
+      <div class="backup-actions">
+        <button class="btn btn-accent" onclick="exportBackupJson()">⬇️ تصدير نسخة احتياطية (JSON)</button>
+        <button class="btn" onclick="triggerImportJson()">⬆️ استيراد من ملف (JSON)</button>
+        <input type="file" id="importJsonInput" accept=".json,application/json" style="display:none;" onchange="handleImportJson(event)" />
       </div>
     </div>
   </div>
@@ -594,6 +612,7 @@
     function getActiveTab() {
       if (document.getElementById("viewPortfolio").style.display !== "none") return "portfolio";
       if (document.getElementById("viewAlert").style.display !== "none") return "alert";
+      if (document.getElementById("viewBackup").style.display !== "none") return "backup";
       return "asset";
     }
 
@@ -612,10 +631,12 @@
       document.getElementById("tabAsset").classList.toggle("active", tabName === "asset");
       document.getElementById("tabPortfolio").classList.toggle("active", tabName === "portfolio");
       document.getElementById("tabAlert").classList.toggle("active", tabName === "alert");
+      document.getElementById("tabBackup").classList.toggle("active", tabName === "backup");
 
       document.getElementById("viewAsset").style.display = tabName === "asset" ? "block" : "none";
       document.getElementById("viewPortfolio").style.display = tabName === "portfolio" ? "block" : "none";
       document.getElementById("viewAlert").style.display = tabName === "alert" ? "block" : "none";
+      document.getElementById("viewBackup").style.display = tabName === "backup" ? "block" : "none";
 
       if (tabName === "asset") {
         document.getElementById("newSymInput").focus();
@@ -625,7 +646,116 @@
       } else if (tabName === "alert") {
         populateSelect("alertAssetSelect");
         renderAlerts();
+      } else if (tabName === "backup") {
+        updateBackupStats();
       }
+    }
+
+    function updateBackupStats() {
+      const box = document.getElementById("backupStatsText");
+      if (!box) return;
+      const posCount = Object.keys(positions).length;
+      box.innerHTML = `
+        • الأصول في القائمة: <strong>${assets.length}</strong><br>
+        • المراكز المفتوحة في المحفظة: <strong>${posCount}</strong><br>
+        • التنبيهات المسجلة: <strong>${alerts.length}</strong>
+      `;
+    }
+
+    function exportBackupJson() {
+      unlockAudio();
+      const backupPayload = {
+        app: "prices-viewer",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        data: {
+          watch_assets_v1: assets,
+          watch_alerts_v1: alerts,
+          watch_positions_v1: positions,
+          watch_theme_v1: savedTheme,
+          watch_sound_v1: soundEnabled,
+          watch_hide_toolbar_v1: hideSideToolbar,
+          watch_tf_list_v1: customTfList,
+          watch_active_tf_v1: activeTvInterval
+        }
+      };
+
+      const jsonStr = JSON.stringify(backupPayload, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const dateTag = new Date().toISOString().slice(0, 10);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `prices-viewer-backup-${dateTag}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast("✅ تم تصدير ملف النسخة الاحتياطية JSON بنجاح");
+    }
+
+    function triggerImportJson() {
+      unlockAudio();
+      const input = document.getElementById("importJsonInput");
+      if (input) {
+        input.value = "";
+        input.click();
+      }
+    }
+
+    function handleImportJson(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          const data = parsed.data || parsed;
+
+          if (!Array.isArray(data.watch_assets_v1)) {
+            showToast("❌ ملف JSON غير صالح أو لا يخص هذا التطبيق");
+            return;
+          }
+
+          assets = data.watch_assets_v1;
+          alerts = Array.isArray(data.watch_alerts_v1) ? data.watch_alerts_v1 : [];
+          positions = (data.watch_positions_v1 && typeof data.watch_positions_v1 === "object") ? data.watch_positions_v1 : {};
+          savedTheme = data.watch_theme_v1 || savedTheme;
+          soundEnabled = typeof data.watch_sound_v1 === "boolean" ? data.watch_sound_v1 : soundEnabled;
+          hideSideToolbar = typeof data.watch_hide_toolbar_v1 === "boolean" ? data.watch_hide_toolbar_v1 : hideSideToolbar;
+          customTfList = Array.isArray(data.watch_tf_list_v1) ? data.watch_tf_list_v1 : customTfList;
+          activeTvInterval = data.watch_active_tf_v1 || activeTvInterval;
+
+          localStorage.setItem("watch_assets_v1", JSON.stringify(assets));
+          localStorage.setItem("watch_alerts_v1", JSON.stringify(alerts));
+          localStorage.setItem("watch_positions_v1", JSON.stringify(positions));
+          localStorage.setItem("watch_theme_v1", savedTheme);
+          localStorage.setItem("watch_sound_v1", JSON.stringify(soundEnabled));
+          localStorage.setItem("watch_hide_toolbar_v1", JSON.stringify(hideSideToolbar));
+          localStorage.setItem("watch_tf_list_v1", JSON.stringify(customTfList));
+          localStorage.setItem("watch_active_tf_v1", activeTvInterval);
+
+          applyTheme(savedTheme);
+          updateSoundButton();
+          populateSelect("posAssetSelect");
+          populateSelect("alertAssetSelect");
+          renderList();
+          renderPositions();
+          renderAlerts();
+          updateTotalPnl();
+          updateBackupStats();
+          connectEquity();
+          connectCrypto();
+
+          showToast("✅ تم استيراد النسخة الاحتياطية واستعادة البيانات بنجاح");
+        } catch (err) {
+          showToast("❌ تعذر قراءة الملف: تأكد أنه بصيغة JSON صحيحة");
+        }
+      };
+      reader.readAsText(file);
     }
 
     function toggleEdit() {
