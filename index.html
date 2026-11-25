@@ -181,6 +181,7 @@
       background: var(--tag-bg); color: var(--accent); font-weight: 700;
     }
     .tag.crypto-tag { color: #38bdf8; }
+    .tag.perp-tag { color: #c084fc; }
     .tag.bell-tag { color: var(--green); }
     .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .pos-sub { font-size: 11px; margin-top: 2px; font-variant-numeric: tabular-nums; }
@@ -276,11 +277,12 @@
     </div>
 
     <div id="viewAsset">
-      <div style="font-size:12px; color:var(--muted);">اختر النوع وأدخل الرمز (مثال الأسهم: NVDA, RGTI — مثال الكريبتو: BTCUSDT):</div>
+      <div style="font-size:12px; color:var(--muted);">اختر النوع وأدخل الرمز (الأسهم: NVDA — سبوت: BTCUSDT — فيوتشر: BTCUSDT, XAUUSDT):</div>
       <div class="row-input">
         <select id="newTypeInput">
           <option value="STOCK">سهم (STOCK)</option>
-          <option value="CRYPTO">كريبتو (CRYPTO)</option>
+          <option value="CRYPTO">كريبتو سبوت (SPOT)</option>
+          <option value="PERP">فيوتشر دائم (PERP)</option>
         </select>
         <input type="text" id="newSymInput" placeholder="SYMBOL" onkeydown="if(event.key==='Enter') addAsset()" />
         <button class="btn btn-accent" onclick="addAsset()">إضافة</button>
@@ -402,8 +404,10 @@
 
     let eqSocket = null;
     let cryptoSocket = null;
+    let perpSocket = null;
     let eqTimer = null;
     let cryptoTimer = null;
+    let perpTimer = null;
     let audioCtx = null;
 
     let currentTvSymbol = "BINANCE:BTCUSDT";
@@ -422,6 +426,12 @@
     const themeBtn = document.getElementById("themeBtn");
     const soundBtn = document.getElementById("soundToggleBtn");
     const editBtn = document.getElementById("editBtn");
+
+    function getTypeLabel(type) {
+      if (type === "STOCK") return "سهم";
+      if (type === "PERP") return "فيوتشر";
+      return "سبوت";
+    }
 
     function unlockAudio() {
       if (!audioCtx) {
@@ -519,6 +529,9 @@
       const clean = (sym || "").trim().toUpperCase();
       if (!clean) return "BINANCE:BTCUSDT";
       if (clean.includes(":")) return clean;
+      if (type === "PERP") {
+        return clean.endsWith(".P") ? `BINANCE:${clean}` : `BINANCE:${clean}.P`;
+      }
       if (type === "CRYPTO") {
         return `BINANCE:${clean}`;
       }
@@ -581,7 +594,7 @@
     function applyCustomTvSymbol() {
       const raw = document.getElementById("tvSymbolInput").value.trim().toUpperCase();
       if (!raw) return;
-      currentTvSymbol = raw.includes(":") ? raw : (raw.endsWith("USDT") ? `BINANCE:${raw}` : raw);
+      currentTvSymbol = raw.includes(":") ? raw : ((raw.endsWith("USDT") || raw.endsWith("USDT.P")) ? `BINANCE:${raw}` : raw);
       document.getElementById("tvSymbolInput").value = currentTvSymbol;
       mountTradingViewFull(currentTvSymbol);
     }
@@ -749,6 +762,7 @@
           updateBackupStats();
           connectEquity();
           connectCrypto();
+          connectPerp();
 
           showToast("✅ تم استيراد النسخة الاحتياطية واستعادة البيانات بنجاح");
         } catch (err) {
@@ -871,7 +885,7 @@
       assets.forEach(a => {
         const opt = document.createElement("option");
         opt.value = `${a.type}:${a.sym}`;
-        opt.textContent = `${a.sym} (${a.type === "STOCK" ? "سهم" : "كريبتو"})`;
+        opt.textContent = `${a.sym} (${getTypeLabel(a.type)})`;
         sel.appendChild(opt);
       });
     }
@@ -880,7 +894,7 @@
       unlockAudio();
       const input = document.getElementById("newSymInput");
       const type = document.getElementById("newTypeInput").value;
-      const sym = input.value.trim().toUpperCase();
+      const sym = input.value.trim().toUpperCase().replace(/\.P$/, "");
       if (!sym) return;
 
       if (!assets.some(a => a.sym === sym && a.type === type)) {
@@ -892,6 +906,7 @@
         populateSelect("alertAssetSelect");
         if (type === "STOCK") connectEquity();
         if (type === "CRYPTO") connectCrypto();
+        if (type === "PERP") connectPerp();
       }
     }
 
@@ -911,6 +926,7 @@
       populateSelect("alertAssetSelect");
       if (type === "STOCK") connectEquity();
       if (type === "CRYPTO") connectCrypto();
+      if (type === "PERP") connectPerp();
     }
 
     function savePosition() {
@@ -969,14 +985,14 @@
       }
 
       entries.forEach(([key, pos]) => {
-        const sym = key.split(":")[1] || key;
+        const [type, sym] = key.split(":");
         const curPrice = marketData[key]?.price;
         const pnl = calcAssetPnl(key, curPrice);
         const row = document.createElement("div");
         row.className = "sub-row";
         row.innerHTML = `
           <div>
-            <strong>${sym}</strong> — Qty: <strong>${pos.qty}</strong> @ <strong>$${formatNum(pos.entry)}</strong>
+            <strong>${sym || key}</strong> <span style="color:var(--muted); font-size:10px;">(${getTypeLabel(type)})</span> — Qty: <strong>${pos.qty}</strong> @ <strong>$${formatNum(pos.entry)}</strong>
             <div style="margin-top:3px;">${pnl ? formatPnlHtml(pnl) : `<span style="color:var(--muted);">Waiting for live price...</span>`}</div>
           </div>
           <button class="btn btn-sm" style="color:var(--red); border-color:var(--red);" onclick="deletePosition('${key}')">حذف</button>
@@ -1064,13 +1080,13 @@
       }
 
       alerts.forEach(al => {
-        const sym = al.assetKey.split(":")[1] || al.assetKey;
+        const [type, sym] = al.assetKey.split(":");
         const symbolCond = al.dir === "gte" ? "≥" : "≤";
         const row = document.createElement("div");
         row.className = `sub-row ${al.triggered ? "triggered" : ""}`;
         row.innerHTML = `
           <div>
-            <strong>${sym}</strong> ${symbolCond} <strong>$${formatNum(al.targetPrice)}</strong>
+            <strong>${sym || al.assetKey}</strong> <span style="color:var(--muted); font-size:10px;">(${getTypeLabel(type)})</span> ${symbolCond} <strong>$${formatNum(al.targetPrice)}</strong>
             <span class="alert-status ${al.triggered ? "st-done" : "st-active"}">
               ${al.triggered ? "تم التنبيه" : "نشط"}
             </span>
@@ -1107,13 +1123,13 @@
         if (hit) {
           al.triggered = true;
           changed = true;
-          const sym = key.split(":")[1] || key;
+          const [type, sym] = key.split(":");
           const condTxt = al.dir === "gte" ? "تجاوز أو وصل إلى" : "هبط إلى أو دون";
-          const msg = `🔔 تنبيه ${sym}: السعر الحالي $${formatNum(price)} ${condTxt} $${formatNum(al.targetPrice)}`;
+          const msg = `🔔 تنبيه ${sym || key} (${getTypeLabel(type)}): السعر الحالي $${formatNum(price)} ${condTxt} $${formatNum(al.targetPrice)}`;
           showToast(msg);
           playBeep();
           if ("Notification" in window && Notification.permission === "granted") {
-            try { new Notification(`تنبيه سعر ${sym}`, { body: msg }); } catch (e) {}
+            try { new Notification(`تنبيه سعر ${sym || key}`, { body: msg }); } catch (e) {}
           }
         }
       });
@@ -1155,15 +1171,22 @@
         const activeAlert = hasActiveAlert(key);
         const pnl = calcAssetPnl(key, price);
 
-        const extraTag = asset.type === "STOCK"
-          ? (formatSession(d.mp) ? `<span class="tag" id="tag-${key}">${formatSession(d.mp)}</span>` : `<span class="tag" id="tag-${key}" style="display:none"></span>`)
-          : `<span class="tag crypto-tag">24H Crypto</span>`;
+        let extraTag = "";
+        let subText = "";
+        if (asset.type === "STOCK") {
+          extraTag = formatSession(d.mp)
+            ? `<span class="tag" id="tag-${key}">${formatSession(d.mp)}</span>`
+            : `<span class="tag" id="tag-${key}" style="display:none"></span>`;
+          subText = d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks";
+        } else if (asset.type === "PERP") {
+          extraTag = `<span class="tag perp-tag">24H Perp</span>`;
+          subText = "Binance Perpetual";
+        } else {
+          extraTag = `<span class="tag crypto-tag">24H Spot</span>`;
+          subText = "Binance Spot";
+        }
 
         const bellBadge = activeAlert ? `<span class="tag bell-tag">🔔</span>` : "";
-
-        const subText = asset.type === "STOCK"
-          ? (d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks")
-          : "Binance Spot";
 
         const prevText = asset.type === "STOCK" && d.pc
           ? `Prev: $${formatNum(d.pc)}`
@@ -1261,10 +1284,13 @@
     function updateStatus() {
       const hasStocks = assets.some(a => a.type === "STOCK");
       const hasCrypto = assets.some(a => a.type === "CRYPTO");
+      const hasPerp = assets.some(a => a.type === "PERP");
+
       const eqOk = !hasStocks || (eqSocket && eqSocket.readyState === WebSocket.OPEN);
       const crOk = !hasCrypto || (cryptoSocket && cryptoSocket.readyState === WebSocket.OPEN);
+      const prOk = !hasPerp || (perpSocket && perpSocket.readyState === WebSocket.OPEN);
 
-      if (eqOk && crOk) {
+      if (eqOk && crOk && prOk) {
         dotEl.classList.add("live");
         statusText.textContent = "متصل لحظياً ببث binance";
       } else {
@@ -1358,6 +1384,35 @@
       };
     }
 
+    function connectPerp() {
+      if (perpSocket) perpSocket.close();
+      clearTimeout(perpTimer);
+      const perpSyms = assets.filter(a => a.type === "PERP").map(a => a.sym.toLowerCase());
+      if (!perpSyms.length) return updateStatus();
+
+      const streams = perpSyms.map(s => `${s}@miniTicker`).join("/");
+      perpSocket = new WebSocket(`wss://fstream.binance.com/stream?streams=${streams}`);
+
+      perpSocket.onopen = () => updateStatus();
+      perpSocket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        const d = msg.data;
+        if (!d || !d.s) return;
+        const key = `PERP:${d.s}`;
+        const prevPrice = marketData[key]?.price;
+        const closePrice = parseFloat(d.c);
+        const openPrice = parseFloat(d.o);
+        const chg = openPrice ? ((closePrice - openPrice) / openPrice) * 100 : 0;
+        marketData[key] = { ...marketData[key], price: closePrice, chg };
+        updateRowUI(key, prevPrice);
+        scheduleSaveMarketCache();
+      };
+      perpSocket.onclose = () => {
+        updateStatus();
+        perpTimer = setTimeout(connectPerp, 2500);
+      };
+    }
+
     applyTheme(savedTheme);
     updateSoundButton();
     populateSelect("posAssetSelect");
@@ -1368,6 +1423,7 @@
     updateTotalPnl();
     connectEquity();
     connectCrypto();
+    connectPerp();
   </script>
 </body>
 </html>
