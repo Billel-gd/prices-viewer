@@ -177,7 +177,7 @@
 
     .sym { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
     .tag {
-      font-size: 9px; padding: 1px 5px; border-radius: 4px;
+      font-size: 10px; padding: 1px 6px; border-radius: 4px;
       background: var(--tag-bg); color: var(--accent); font-weight: 700;
     }
     .tag.crypto-tag { color: #38bdf8; }
@@ -1146,7 +1146,13 @@
     }
 
     function formatSession(mp) {
-      const map = { "R": "Regular", "P": "Pre", "A": "After", "O": "24/5 Night", "C": "Closed" };
+      const map = {
+        "R": "☀ Regular",
+        "P": "🌞 Pre",
+        "A": "🌤 After",
+        "O": "🌙 24/5 NIGHT",
+        "C": "🔒 Closed"
+      };
       return map[mp] || "";
     }
 
