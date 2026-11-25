@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#161a1e" id="themeMeta" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="prices viewer" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>مراقب الأسعار + شارت TradingView</title>
+  <style>
+    :root[data-theme="dark"] {
+      --bg: #161a1e;
+      --card: #1e2329;
+      --border: #2b3139;
+      --text: #eaecef;
+      --muted: #848e9c;
+      --tag-bg: #2b3139;
+      --flash-up: rgba(14, 203, 129, 0.18);
+      --flash-down: rgba(246, 70, 93, 0.18);
+    }
+    :root[data-theme="light"] {
+      --bg: #f5f7fa;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --tag-bg: #f1f5f9;
+      --flash-up: rgba(14, 203, 129, 0.14);
+      --flash-down: rgba(246, 70, 93, 0.14);
+    }
+    :root {
+      --green: #0ecb81;
+      --red: #f6465d;
+      --accent: #f0b90b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      background: var(--bg); color: var(--text); padding: 14px;
+      max-width: 580px; margin: 0 auto; transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
+    }
+    .title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); display: inline-block; }
+    .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn {
+      background: var(--card); color: var(--text); border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600;
+    }
+    .btn.active-mode { border-color: var(--accent); color: var(--accent); }
+    .btn-accent { background: var(--accent); color: #161a1e; border: none; font-weight: 700; }
+    .btn-sm { padding: 4px 8px; font-size: 11px; }
+
+    .toast {
+      position: sticky; top: 8px; z-index: 50;
+      background: var(--card); border: 1px solid var(--accent); border-right: 4px solid var(--accent);
+      padding: 10px 12px; border-radius: 8px; margin-bottom: 12px;
+      display: none; justify-content: space-between; align-items: center; gap: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+    .toast.show { display: flex; }
+    .toast-msg { font-size: 13px; font-weight: 700; }
+
+    .summary-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 12px; margin-bottom: 10px; font-size: 12px; direction: ltr;
+    }
+    .pnl-pos { color: var(--green); font-weight: 700; }
+    .pnl-neg { color: var(--red); font-weight: 700; }
+    .pnl-flat { color: var(--muted); font-weight: 700; }
+
+    .panel {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; margin-bottom: 14px; display: none;
+    }
+    .panel.show { display: block; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .tab-btn {
+      flex: 1; padding: 7px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent); color: #161a1e; border-color: var(--accent); }
+
+    .row-input { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    select, input {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 10px; border-radius: 6px; font-size: 13px; outline: none;
+    }
+    input { flex: 1; min-width: 100px; direction: ltr; }
+    select { cursor: pointer; }
+
+    .sub-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .sub-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .sub-list { display: flex; flex-direction: column; gap: 6px; direction: ltr; }
+    .sub-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border); padding: 8px 10px; border-radius: 7px; font-size: 12px;
+    }
+    .sub-row.triggered { border-color: var(--green); opacity: 0.85; }
+    .alert-status { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+    .st-active { background: rgba(240, 185, 11, 0.16); color: var(--accent); }
+    .st-done { background: rgba(14, 203, 129, 0.16); color: var(--green); }
+
+    .table-head {
+      display: grid; grid-template-columns: 1.35fr 1.05fr 0.95fr;
+      color: var(--muted); font-size: 11px; padding: 0 6px 8px; direction: ltr;
+    }
+    .table-head span:nth-child(2), .table-head span:nth-child(3) { text-align: right; }
+
+    .list { display: flex; flex-direction: column; gap: 6px; direction: ltr; }
+    .item {
+      display: grid; grid-template-columns: 1.35fr 1.05fr 0.95fr; align-items: center;
+      background: var(--card); border: 1px solid var(--border); padding: 11px 10px; border-radius: 8px;
+      transition: background-color 0.25s ease, transform 0.12s ease, box-shadow 0.12s ease;
+      position: relative;
+    }
+    .item.has-alert { border-left: 3px solid var(--accent); }
+    .item.dragging {
+      opacity: 0.92;
+      border-color: var(--accent);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+      transform: scale(1.015);
+      z-index: 20;
+    }
+    .flash-up { background-color: var(--flash-up); }
+    .flash-down { background-color: var(--flash-down); }
+
+    .sym-wrap { display: flex; align-items: center; gap: 6px; }
+
+    .drag-handle {
+      display: none;
+      align-items: center; justify-content: center;
+      width: 26px; height: 34px;
+      border-radius: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    .edit-mode .drag-handle { display: flex; }
+
+    .edit-controls { display: none; flex-direction: column; gap: 2px; }
+    .edit-mode .edit-controls { display: flex; }
+    .move-btn {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      font-size: 9px; line-height: 1; border-radius: 3px; cursor: pointer; padding: 2px 5px;
+    }
+    .move-btn:disabled { opacity: 0.3; cursor: default; }
+
+    .del-btn {
+      background: rgba(246, 70, 93, 0.15); border: 1px solid var(--red); color: var(--red);
+      font-size: 11px; border-radius: 4px; cursor: pointer; padding: 3px 6px; display: none;
+    }
+    .edit-mode .del-btn { display: inline-block; }
+
+    .sym { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .tag {
+      font-size: 9px; padding: 1px 5px; border-radius: 4px;
+      background: var(--tag-bg); color: var(--accent); font-weight: 700;
+    }
+    .tag.crypto-tag { color: #38bdf8; }
+    .tag.bell-tag { color: var(--green); }
+    .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .pos-sub { font-size: 11px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+    .price-col { text-align: right; }
+    .price { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .prev { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .chg-col { display: flex; justify-content: flex-end; }
+    .badge {
+      min-width: 76px; text-align: center; padding: 6px 8px; border-radius: 5px;
+      font-weight: 700; font-size: 13px; color: #fff; background: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .badge.up { background: var(--green); }
+    .badge.down { background: var(--red); }
+
+    .status-bar {
+      text-align: center; font-size: 11px; color: var(--muted); margin-top: 12px;
+    }
+
+    .tv-modal {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(0, 0, 0, 0.78);
+      display: none; align-items: stretch; justify-content: center;
+    }
+    .tv-modal.show { display: flex; }
+    .tv-shell {
+      width: 100%; height: 100%;
+      background: var(--card);
+      display: flex; flex-direction: column;
+    }
+    .tv-topbar {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border); direction: ltr; flex-wrap: wrap;
+    }
+    .tv-sym-box { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px; flex-wrap: wrap; }
+    .tv-sym-input {
+      width: 125px; padding: 5px 8px; font-size: 12px; border-radius: 5px;
+    }
+    .tv-tf-bar {
+      display: flex; align-items: center; gap: 4px; padding: 6px 10px;
+      border-bottom: 1px solid var(--border); direction: ltr; flex-wrap: wrap;
+      background: var(--bg);
+    }
+    .tf-chip {
+      background: var(--card); color: var(--muted); border: 1px solid var(--border);
+      padding: 3px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .tf-chip.active { background: var(--accent); color: #161a1e; border-color: var(--accent); }
+    #tvFullContainer {
+      flex: 1; width: 100%; height: 100%; min-height: 0; direction: ltr;
+      touch-action: none;
+    }
+    .sym-click { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color 0.15s; }
+    .sym-click:active { text-decoration-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="title">
+      <span class="dot" id="statusDot"></span>
+      <span>مراقب الأسعار</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-accent" onclick="openPanel('asset')">+ إضافة</button>
+      <button class="btn" onclick="openPanel('portfolio')">💼 محفظة</button>
+      <button class="btn" onclick="openPanel('alert')">🔔 تنبيه</button>
+      <button class="btn" onclick="openTvModal('BINANCE:BTCUSDT', 'CRYPTO')">📈 شارت TV</button>
+      <button class="btn" id="editBtn" onclick="toggleEdit()">تعديل / ترتيب</button>
+      <button class="btn" id="themeBtn" onclick="toggleTheme()">🌙 Dark</button>
+    </div>
+  </header>
+
+  <div class="toast" id="alertToast">
+    <span class="toast-msg" id="toastText"></span>
+    <button class="btn btn-sm" onclick="dismissToast()">إغلاق</button>
+  </div>
+
+  <div class="summary-bar" id="portfolioSummary">
+    <span style="color:var(--muted);">Total Unrealized P&L:</span>
+    <span class="pnl-flat" id="totalPnlText">$0.00 (0.00%)</span>
+  </div>
+
+  <div class="panel" id="mainPanel">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabAsset" onclick="switchTab('asset')">إضافة أصل</button>
+      <button class="tab-btn" id="tabPortfolio" onclick="switchTab('portfolio')">المحفظة P&L</button>
+      <button class="tab-btn" id="tabAlert" onclick="switchTab('alert')">التنبيهات</button>
+    </div>
+
+    <div id="viewAsset">
+      <div style="font-size:12px; color:var(--muted);">اختر النوع وأدخل الرمز (مثال الأسهم: NVDA, RGTI — مثال الكريبتو: BTCUSDT):</div>
+      <div class="row-input">
+        <select id="newTypeInput">
+          <option value="STOCK">سهم (STOCK)</option>
+          <option value="CRYPTO">كريبتو (CRYPTO)</option>
+        </select>
+        <input type="text" id="newSymInput" placeholder="SYMBOL" onkeydown="if(event.key==='Enter') addAsset()" />
+        <button class="btn btn-accent" onclick="addAsset()">إضافة</button>
+      </div>
+    </div>
+
+    <div id="viewPortfolio" style="display:none;">
+      <div style="font-size:12px; color:var(--muted);">أدخل سعر الدخول وعدد الأسهم/الكمية لحساب الربح أو الخسارة العائمة تلقائياً:</div>
+      <div class="row-input">
+        <select id="posAssetSelect"></select>
+        <input type="number" step="any" id="posEntryInput" placeholder="Entry Price ($)" />
+        <input type="number" step="any" id="posQtyInput" placeholder="Qty (Shares/Units)" />
+        <button class="btn btn-accent" onclick="savePosition()">حفظ المركز</button>
+      </div>
+
+      <div class="sub-section">
+        <div class="sub-title">
+          <span>المراكز المفتوحة المسجلة</span>
+          <span id="positionsCount">0</span>
+        </div>
+        <div class="sub-list" id="positionList"></div>
+      </div>
+    </div>
+
+    <div id="viewAlert" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+        <span style="font-size:12px; color:var(--muted);">حدد السعر المستهدف للتنبيه بالصوت والإشعار:</span>
+        <button class="btn btn-sm" id="soundToggleBtn" onclick="toggleSound()">🔊 الصوت: مفعل</button>
+      </div>
+      <div class="row-input">
+        <select id="alertAssetSelect"></select>
+        <select id="alertDirInput">
+          <option value="gte">السعر ≥ (أعلى أو يساوي)</option>
+          <option value="lte">السعر ≤ (أقل أو يساوي)</option>
+        </select>
+        <input type="number" step="any" id="alertPriceInput" placeholder="Target Price ($)" />
+        <button class="btn btn-accent" onclick="addAlert()">حفظ التنبيه</button>
+      </div>
+
+      <div class="sub-section">
+        <div class="sub-title">
+          <span>التنبيهات المسجلة</span>
+          <span id="alertsCount">0</span>
+        </div>
+        <div class="sub-list" id="alertList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-head">
+    <span>Name / Session / P&L</span>
+    <span>Last Price</span>
+    <span>Change(%)</span>
+  </div>
+
+  <div class="list" id="assetList"></div>
+  <div class="status-bar" id="statusText">جاري الاتصال ببث بايننس...</div>
+
+  <div class="tv-modal" id="tvModal">
+    <div class="tv-shell">
+      <div class="tv-topbar">
+        <div class="tv-sym-box">
+          <input type="text" class="tv-sym-input" id="tvSymbolInput" placeholder="BINANCE:BTCUSDT" onkeydown="if(event.key==='Enter') applyCustomTvSymbol()" />
+          <button class="btn btn-sm btn-accent" onclick="applyCustomTvSymbol()">تبديل</button>
+          <button class="btn btn-sm" id="sideToolbarBtn" onclick="toggleSideToolbar()">🛠 الأدوات: ظاهر</button>
+        </div>
+        <button class="btn btn-sm" onclick="closeTvModal()">✕ إغلاق الشارت</button>
+      </div>
+      <div class="tv-tf-bar" id="tvTfBar"></div>
+      <div id="tvFullContainer"></div>
+    </div>
+  </div>
+
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <script>
+    const DEFAULT_ASSETS = [
+      { sym: "QBTZ", type: "STOCK" },
+      { sym: "RGTZ", type: "STOCK" },
+      { sym: "SMCI", type: "STOCK" },
+      { sym: "RGTI", type: "STOCK" },
+      { sym: "QBTS", type: "STOCK" },
+      { sym: "RDW", type: "STOCK" },
+      { sym: "CLSK", type: "STOCK" },
+      { sym: "BTCUSDT", type: "CRYPTO" }
+    ];
+
+    const DEFAULT_TF_LIST = ["1", "5", "15", "30", "60", "240", "1D", "1W"];
+
+    let assets = JSON.parse(localStorage.getItem("watch_assets_v1")) || DEFAULT_ASSETS;
+    let alerts = JSON.parse(localStorage.getItem("watch_alerts_v1")) || [];
+    let positions = JSON.parse(localStorage.getItem("watch_positions_v1")) || {};
+    let savedTheme = localStorage.getItem("watch_theme_v1") || "dark";
+    let soundEnabled = JSON.parse(localStorage.getItem("watch_sound_v1") ?? "true");
+    let hideSideToolbar = JSON.parse(localStorage.getItem("watch_hide_toolbar_v1") ?? "false");
+    let customTfList = JSON.parse(localStorage.getItem("watch_tf_list_v1")) || DEFAULT_TF_LIST;
+    let activeTvInterval = localStorage.getItem("watch_active_tf_v1") || "15";
+
+    let marketData = JSON.parse(localStorage.getItem("watch_market_cache_v1") || "{}");
+    let cacheSaveTimer = null;
+    function scheduleSaveMarketCache() {
+      if (cacheSaveTimer) return;
+      cacheSaveTimer = setTimeout(() => {
+        cacheSaveTimer = null;
+        try {
+          localStorage.setItem("watch_market_cache_v1", JSON.stringify(marketData));
+        } catch (e) {}
+      }, 1500);
+    }
+
+    let eqSocket = null;
+    let cryptoSocket = null;
+    let eqTimer = null;
+    let cryptoTimer = null;
+    let audioCtx = null;
+
+    let currentTvSymbol = "BINANCE:BTCUSDT";
+    let tvModalOpen = false;
+
+    let dragState = {
+      active: false,
+      index: -1,
+      rowEl: null
+    };
+
+    const listEl = document.getElementById("assetList");
+    const dotEl = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const mainPanel = document.getElementById("mainPanel");
+    const themeBtn = document.getElementById("themeBtn");
+    const soundBtn = document.getElementById("soundToggleBtn");
+    const editBtn = document.getElementById("editBtn");
+
+    function unlockAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+
+    function playBeep() {
+      if (!soundEnabled) return;
+      try {
+        unlockAudio();
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.45);
+      } catch (e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      localStorage.setItem("watch_sound_v1", JSON.stringify(soundEnabled));
+      updateSoundButton();
+      if (soundEnabled) playBeep();
+    }
+
+    function updateSoundButton() {
+      if (soundBtn) soundBtn.textContent = soundEnabled ? "🔊 الصوت: مفعل" : "🔇 الصوت: مكتوم";
+    }
+
+    function updateToolbarButton() {
+      const btn = document.getElementById("sideToolbarBtn");
+      if (!btn) return;
+      btn.textContent = hideSideToolbar ? "🛠 الأدوات: مخفي" : "🛠 الأدوات: ظاهر";
+      btn.classList.toggle("active-mode", !hideSideToolbar);
+    }
+
+    function toggleSideToolbar() {
+      hideSideToolbar = !hideSideToolbar;
+      localStorage.setItem("watch_hide_toolbar_v1", JSON.stringify(hideSideToolbar));
+      updateToolbarButton();
+      if (tvModalOpen) {
+        mountTradingViewFull(currentTvSymbol);
+      }
+    }
+
+    function formatTfLabel(tf) {
+      if (tf === "1D") return "1D";
+      if (tf === "1W") return "1W";
+      if (tf === "1M") return "1M";
+      const n = parseInt(tf, 10);
+      if (!isNaN(n)) {
+        return n >= 60 && n % 60 === 0 ? `${n / 60}h` : `${n}m`;
+      }
+      return tf;
+    }
+
+    function renderTvTimeframes() {
+      const bar = document.getElementById("tvTfBar");
+      if (!bar) return;
+      bar.innerHTML = "";
+
+      customTfList.forEach(tf => {
+        const b = document.createElement("button");
+        b.className = `tf-chip ${String(activeTvInterval) === String(tf) ? "active" : ""}`;
+        b.textContent = formatTfLabel(tf);
+        b.onclick = () => selectTvInterval(tf);
+        bar.appendChild(b);
+      });
+    }
+
+    function selectTvInterval(tf) {
+      activeTvInterval = String(tf);
+      localStorage.setItem("watch_active_tf_v1", activeTvInterval);
+      renderTvTimeframes();
+      if (tvModalOpen) {
+        mountTradingViewFull(currentTvSymbol);
+      }
+    }
+
+    function mapToTvSymbol(sym, type) {
+      const clean = (sym || "").trim().toUpperCase();
+      if (!clean) return "BINANCE:BTCUSDT";
+      if (clean.includes(":")) return clean;
+      if (type === "CRYPTO") {
+        return `BINANCE:${clean}`;
+      }
+      return clean;
+    }
+
+    function mountTradingViewFull(tvSym) {
+      const box = document.getElementById("tvFullContainer");
+      if (!box) return;
+      box.innerHTML = "";
+
+      if (typeof TradingView === "undefined" || !TradingView.widget) {
+        box.innerHTML = `<div style="padding:20px; text-align:center; color:var(--muted);">تعذر تحميل مكتبة TradingView (تحقق من الاتصال بالإنترنت)</div>`;
+        return;
+      }
+
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      const widgetId = "tv_widget_" + Date.now();
+      const targetDiv = document.createElement("div");
+      targetDiv.id = widgetId;
+      targetDiv.style.width = "100%";
+      targetDiv.style.height = "100%";
+      box.appendChild(targetDiv);
+
+      new TradingView.widget({
+        container_id: widgetId,
+        autosize: true,
+        symbol: tvSym,
+        interval: activeTvInterval,
+        timezone: "Etc/UTC",
+        theme: isDark ? "dark" : "light",
+        style: "1",
+        locale: "en",
+        enable_publishing: false,
+        allow_symbol_change: true,
+        hide_side_toolbar: hideSideToolbar,
+        withdateranges: true,
+        details: false,
+        hotlist: false,
+        calendar: false,
+        studies: [],
+        show_popup_button: true,
+        popup_width: "1000",
+        popup_height: "650"
+      });
+    }
+
+    function openTvModal(sym, type = "STOCK") {
+      if (listEl.classList.contains("edit-mode")) return;
+      unlockAudio();
+      currentTvSymbol = mapToTvSymbol(sym, type);
+      document.getElementById("tvSymbolInput").value = currentTvSymbol;
+      updateToolbarButton();
+      renderTvTimeframes();
+      document.getElementById("tvModal").classList.add("show");
+      tvModalOpen = true;
+      mountTradingViewFull(currentTvSymbol);
+    }
+
+    function applyCustomTvSymbol() {
+      const raw = document.getElementById("tvSymbolInput").value.trim().toUpperCase();
+      if (!raw) return;
+      currentTvSymbol = raw.includes(":") ? raw : (raw.endsWith("USDT") ? `BINANCE:${raw}` : raw);
+      document.getElementById("tvSymbolInput").value = currentTvSymbol;
+      mountTradingViewFull(currentTvSymbol);
+    }
+
+    function closeTvModal() {
+      tvModalOpen = false;
+      document.getElementById("tvModal").classList.remove("show");
+      document.getElementById("tvFullContainer").innerHTML = "";
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("watch_theme_v1", theme);
+      const isDark = theme === "dark";
+      themeBtn.textContent = isDark ? "🌙 Dark" : "☀️ Light";
+      document.getElementById("themeMeta").setAttribute("content", isDark ? "#161a1e" : "#f5f7fa");
+      if (tvModalOpen) {
+        mountTradingViewFull(currentTvSymbol);
+      }
+    }
+
+    function toggleTheme() {
+      unlockAudio();
+      const current = document.documentElement.getAttribute("data-theme");
+      applyTheme(current === "dark" ? "light" : "dark");
+    }
+
+    function getActiveTab() {
+      if (document.getElementById("viewPortfolio").style.display !== "none") return "portfolio";
+      if (document.getElementById("viewAlert").style.display !== "none") return "alert";
+      return "asset";
+    }
+
+    function openPanel(tabName) {
+      unlockAudio();
+      const isSameOpen = mainPanel.classList.contains("show") && getActiveTab() === tabName;
+      if (isSameOpen) {
+        mainPanel.classList.remove("show");
+        return;
+      }
+      mainPanel.classList.add("show");
+      switchTab(tabName);
+    }
+
+    function switchTab(tabName) {
+      document.getElementById("tabAsset").classList.toggle("active", tabName === "asset");
+      document.getElementById("tabPortfolio").classList.toggle("active", tabName === "portfolio");
+      document.getElementById("tabAlert").classList.toggle("active", tabName === "alert");
+
+      document.getElementById("viewAsset").style.display = tabName === "asset" ? "block" : "none";
+      document.getElementById("viewPortfolio").style.display = tabName === "portfolio" ? "block" : "none";
+      document.getElementById("viewAlert").style.display = tabName === "alert" ? "block" : "none";
+
+      if (tabName === "asset") {
+        document.getElementById("newSymInput").focus();
+      } else if (tabName === "portfolio") {
+        populateSelect("posAssetSelect");
+        renderPositions();
+      } else if (tabName === "alert") {
+        populateSelect("alertAssetSelect");
+        renderAlerts();
+      }
+    }
+
+    function toggleEdit() {
+      unlockAudio();
+      const isEdit = listEl.classList.toggle("edit-mode");
+      editBtn.classList.toggle("active-mode", isEdit);
+      editBtn.textContent = isEdit ? "✓ إنهاء الترتيب" : "تعديل / ترتيب";
+    }
+
+    function moveAsset(index, delta) {
+      unlockAudio();
+      const targetIndex = index + delta;
+      if (targetIndex < 0 || targetIndex >= assets.length) return;
+      const temp = assets[index];
+      assets[index] = assets[targetIndex];
+      assets[targetIndex] = temp;
+      saveAssets();
+      renderList();
+    }
+
+    function startTouchDrag(e, index) {
+      if (!listEl.classList.contains("edit-mode")) return;
+      unlockAudio();
+      const touch = e.touches ? e.touches[0] : e;
+      const rowEl = listEl.querySelector(`.item[data-index="${index}"]`);
+      if (!rowEl) return;
+
+      dragState = {
+        active: true,
+        sourceIndex: index,
+        targetIndex: index,
+        rowEl,
+        startY: touch.clientY,
+        currentY: touch.clientY
+      };
+      rowEl.classList.add("dragging");
+      if (e.cancelable) e.preventDefault();
+    }
+
+    function updateDragVisuals(items, sourceIdx, targetIdx, offsetY) {
+      const draggedEl = items[sourceIdx];
+      const stepHeight = draggedEl ? (draggedEl.getBoundingClientRect().height + 6) : 56;
+
+      items.forEach((el, idx) => {
+        if (idx === sourceIdx) {
+          el.style.transform = `translateY(${offsetY}px) scale(1.015)`;
+          el.classList.add("dragging");
+          return;
+        }
+        el.classList.remove("dragging");
+        if (sourceIdx < targetIdx && idx > sourceIdx && idx <= targetIdx) {
+          el.style.transform = `translateY(${-stepHeight}px)`;
+        } else if (sourceIdx > targetIdx && idx >= targetIdx && idx < sourceIdx) {
+          el.style.transform = `translateY(${stepHeight}px)`;
+        } else {
+          el.style.transform = "";
+        }
+      });
+    }
+
+    function handleTouchMove(e) {
+      if (!dragState.active) return;
+      const touch = e.touches ? e.touches[0] : e;
+      const currentY = touch.clientY;
+      if (e.cancelable) e.preventDefault();
+
+      dragState.currentY = currentY;
+      const deltaY = currentY - dragState.startY;
+      const items = Array.from(listEl.querySelectorAll(".item"));
+      if (!items.length) return;
+
+      let bestTarget = dragState.sourceIndex;
+      for (let i = 0; i < items.length; i++) {
+        const rect = items[i].getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (currentY > midY) {
+          bestTarget = i;
+        }
+      }
+
+      dragState.targetIndex = bestTarget;
+      updateDragVisuals(items, dragState.sourceIndex, dragState.targetIndex, deltaY);
+    }
+
+    function endTouchDrag() {
+      if (!dragState.active) return;
+      const { sourceIndex, targetIndex } = dragState;
+      dragState.active = false;
+      dragState.sourceIndex = -1;
+      dragState.targetIndex = -1;
+      dragState.rowEl = null;
+
+      if (sourceIndex !== targetIndex && sourceIndex >= 0 && targetIndex >= 0) {
+        const moved = assets.splice(sourceIndex, 1)[0];
+        assets.splice(targetIndex, 0, moved);
+        saveAssets();
+      }
+      renderList();
+    }
+
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", endTouchDrag);
+    document.addEventListener("touchcancel", endTouchDrag);
+
+    function saveAssets() {
+      localStorage.setItem("watch_assets_v1", JSON.stringify(assets));
+    }
+
+    function populateSelect(selectId) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      sel.innerHTML = "";
+      assets.forEach(a => {
+        const opt = document.createElement("option");
+        opt.value = `${a.type}:${a.sym}`;
+        opt.textContent = `${a.sym} (${a.type === "STOCK" ? "سهم" : "كريبتو"})`;
+        sel.appendChild(opt);
+      });
+    }
+
+    function addAsset() {
+      unlockAudio();
+      const input = document.getElementById("newSymInput");
+      const type = document.getElementById("newTypeInput").value;
+      const sym = input.value.trim().toUpperCase();
+      if (!sym) return;
+
+      if (!assets.some(a => a.sym === sym && a.type === type)) {
+        assets.push({ sym, type });
+        saveAssets();
+        input.value = "";
+        renderList();
+        populateSelect("posAssetSelect");
+        populateSelect("alertAssetSelect");
+        if (type === "STOCK") connectEquity();
+        if (type === "CRYPTO") connectCrypto();
+      }
+    }
+
+    function removeAsset(sym, type) {
+      unlockAudio();
+      const key = `${type}:${sym}`;
+      assets = assets.filter(a => !(a.sym === sym && a.type === type));
+      delete marketData[key];
+      delete positions[key];
+      saveAssets();
+      scheduleSaveMarketCache();
+      localStorage.setItem("watch_positions_v1", JSON.stringify(positions));
+      renderList();
+      renderPositions();
+      updateTotalPnl();
+      populateSelect("posAssetSelect");
+      populateSelect("alertAssetSelect");
+      if (type === "STOCK") connectEquity();
+      if (type === "CRYPTO") connectCrypto();
+    }
+
+    function savePosition() {
+      unlockAudio();
+      const key = document.getElementById("posAssetSelect").value;
+      const entry = parseFloat(document.getElementById("posEntryInput").value);
+      const qty = parseFloat(document.getElementById("posQtyInput").value);
+      if (!key || isNaN(entry) || entry <= 0 || isNaN(qty) || qty <= 0) return;
+
+      positions[key] = { entry, qty };
+      localStorage.setItem("watch_positions_v1", JSON.stringify(positions));
+      document.getElementById("posEntryInput").value = "";
+      document.getElementById("posQtyInput").value = "";
+      renderPositions();
+      renderList();
+      updateTotalPnl();
+    }
+
+    function deletePosition(key) {
+      delete positions[key];
+      localStorage.setItem("watch_positions_v1", JSON.stringify(positions));
+      renderPositions();
+      renderList();
+      updateTotalPnl();
+    }
+
+    function calcAssetPnl(key, currentPrice) {
+      const pos = positions[key];
+      const price = parseFloat(currentPrice);
+      if (!pos || !pos.entry || !pos.qty || !price) return null;
+      const pnlUsd = (price - pos.entry) * pos.qty;
+      const pnlPct = ((price - pos.entry) / pos.entry) * 100;
+      const costBasis = pos.entry * pos.qty;
+      return { pnlUsd, pnlPct, costBasis, entry: pos.entry, qty: pos.qty };
+    }
+
+    function formatPnlHtml(pnl) {
+      if (!pnl) return "";
+      const cls = pnl.pnlUsd > 0 ? "pnl-pos" : (pnl.pnlUsd < 0 ? "pnl-neg" : "pnl-flat");
+      const sign = pnl.pnlUsd > 0 ? "+" : "";
+      return `<span class="${cls}">P&L: ${sign}$${formatNum(pnl.pnlUsd)} (${sign}${pnl.pnlPct.toFixed(2)}%)</span>`;
+    }
+
+    function renderPositions() {
+      const container = document.getElementById("positionList");
+      const countEl = document.getElementById("positionsCount");
+      if (!container || !countEl) return;
+
+      const entries = Object.entries(positions);
+      countEl.textContent = entries.length;
+      container.innerHTML = "";
+
+      if (!entries.length) {
+        container.innerHTML = `<div style="font-size:12px; color:var(--muted); text-align:center; padding:8px;">لا توجد مراكز محفوظة حالياً</div>`;
+        return;
+      }
+
+      entries.forEach(([key, pos]) => {
+        const sym = key.split(":")[1] || key;
+        const curPrice = marketData[key]?.price;
+        const pnl = calcAssetPnl(key, curPrice);
+        const row = document.createElement("div");
+        row.className = "sub-row";
+        row.innerHTML = `
+          <div>
+            <strong>${sym}</strong> — Qty: <strong>${pos.qty}</strong> @ <strong>$${formatNum(pos.entry)}</strong>
+            <div style="margin-top:3px;">${pnl ? formatPnlHtml(pnl) : `<span style="color:var(--muted);">Waiting for live price...</span>`}</div>
+          </div>
+          <button class="btn btn-sm" style="color:var(--red); border-color:var(--red);" onclick="deletePosition('${key}')">حذف</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function updateTotalPnl() {
+      const totalEl = document.getElementById("totalPnlText");
+      if (!totalEl) return;
+
+      let totalPnl = 0;
+      let totalCost = 0;
+      let hasAny = false;
+
+      Object.keys(positions).forEach(key => {
+        const pnl = calcAssetPnl(key, marketData[key]?.price);
+        if (pnl) {
+          hasAny = true;
+          totalPnl += pnl.pnlUsd;
+          totalCost += pnl.costBasis;
+        }
+      });
+
+      if (!hasAny) {
+        totalEl.className = "pnl-flat";
+        totalEl.textContent = "$0.00 (0.00%)";
+        return;
+      }
+
+      const totalPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
+      const sign = totalPnl > 0 ? "+" : "";
+      totalEl.className = totalPnl > 0 ? "pnl-pos" : (totalPnl < 0 ? "pnl-neg" : "pnl-flat");
+      totalEl.textContent = `${sign}$${formatNum(totalPnl)} (${sign}${totalPct.toFixed(2)}%)`;
+    }
+
+    function saveAlerts() {
+      localStorage.setItem("watch_alerts_v1", JSON.stringify(alerts));
+      renderList();
+      renderAlerts();
+    }
+
+    function addAlert() {
+      unlockAudio();
+      const assetKey = document.getElementById("alertAssetSelect").value;
+      const dir = document.getElementById("alertDirInput").value;
+      const targetPrice = parseFloat(document.getElementById("alertPriceInput").value);
+      if (!assetKey || isNaN(targetPrice) || targetPrice <= 0) return;
+
+      alerts.push({
+        id: Date.now(),
+        assetKey,
+        dir,
+        targetPrice,
+        triggered: false
+      });
+      document.getElementById("alertPriceInput").value = "";
+      saveAlerts();
+    }
+
+    function resetAlert(id) {
+      const al = alerts.find(x => x.id === id);
+      if (al) {
+        al.triggered = false;
+        saveAlerts();
+      }
+    }
+
+    function deleteAlert(id) {
+      alerts = alerts.filter(x => x.id !== id);
+      saveAlerts();
+    }
+
+    function renderAlerts() {
+      const container = document.getElementById("alertList");
+      const countEl = document.getElementById("alertsCount");
+      if (!container || !countEl) return;
+      countEl.textContent = alerts.length;
+      container.innerHTML = "";
+
+      if (!alerts.length) {
+        container.innerHTML = `<div style="font-size:12px; color:var(--muted); text-align:center; padding:8px;">لا توجد تنبيهات مسجلة حالياً</div>`;
+        return;
+      }
+
+      alerts.forEach(al => {
+        const sym = al.assetKey.split(":")[1] || al.assetKey;
+        const symbolCond = al.dir === "gte" ? "≥" : "≤";
+        const row = document.createElement("div");
+        row.className = `sub-row ${al.triggered ? "triggered" : ""}`;
+        row.innerHTML = `
+          <div>
+            <strong>${sym}</strong> ${symbolCond} <strong>$${formatNum(al.targetPrice)}</strong>
+            <span class="alert-status ${al.triggered ? "st-done" : "st-active"}">
+              ${al.triggered ? "تم التنبيه" : "نشط"}
+            </span>
+          </div>
+          <div style="display:flex; gap:4px;">
+            ${al.triggered ? `<button class="btn btn-sm" onclick="resetAlert(${al.id})">إعادة تفعيل</button>` : ""}
+            <button class="btn btn-sm" style="color:var(--red); border-color:var(--red);" onclick="deleteAlert(${al.id})">حذف</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("alertToast");
+      const text = document.getElementById("toastText");
+      if (!toast || !text) return;
+      text.textContent = msg;
+      toast.classList.add("show");
+    }
+
+    function dismissToast() {
+      document.getElementById("alertToast").classList.remove("show");
+    }
+
+    function checkAlerts(key, currentPrice) {
+      const price = parseFloat(currentPrice);
+      if (isNaN(price) || price <= 0) return;
+
+      let changed = false;
+      alerts.forEach(al => {
+        if (al.assetKey !== key || al.triggered) return;
+        const hit = (al.dir === "gte" && price >= al.targetPrice) || (al.dir === "lte" && price <= al.targetPrice);
+        if (hit) {
+          al.triggered = true;
+          changed = true;
+          const sym = key.split(":")[1] || key;
+          const condTxt = al.dir === "gte" ? "تجاوز أو وصل إلى" : "هبط إلى أو دون";
+          const msg = `🔔 تنبيه ${sym}: السعر الحالي $${formatNum(price)} ${condTxt} $${formatNum(al.targetPrice)}`;
+          showToast(msg);
+          playBeep();
+          if ("Notification" in window && Notification.permission === "granted") {
+            try { new Notification(`تنبيه سعر ${sym}`, { body: msg }); } catch (e) {}
+          }
+        }
+      });
+
+      if (changed) {
+        localStorage.setItem("watch_alerts_v1", JSON.stringify(alerts));
+        renderList();
+        renderAlerts();
+      }
+    }
+
+    function hasActiveAlert(key) {
+      return alerts.some(a => a.assetKey === key && !a.triggered);
+    }
+
+    function formatSession(mp) {
+      const map = { "R": "Regular", "P": "Pre", "A": "After", "O": "24/5 Night", "C": "Closed" };
+      return map[mp] || "";
+    }
+
+    function formatNum(num) {
+      const n = parseFloat(num);
+      if (isNaN(n)) return "---";
+      if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return Math.abs(n) < 10 ? n.toFixed(3) : n.toFixed(2);
+    }
+
+    function renderList(activeDragIdx = -1) {
+      listEl.innerHTML = "";
+      assets.forEach((asset, idx) => {
+        const key = `${asset.type}:${asset.sym}`;
+        const d = marketData[key] || {};
+        const price = parseFloat(d.price || 0);
+        const chg = d.chg !== undefined ? parseFloat(d.chg) : 0;
+        const isUp = chg > 0;
+        const isDown = chg < 0;
+        const badgeClass = isUp ? "up" : (isDown ? "down" : "");
+        const sign = isUp ? "+" : "";
+        const activeAlert = hasActiveAlert(key);
+        const pnl = calcAssetPnl(key, price);
+
+        const extraTag = asset.type === "STOCK"
+          ? (formatSession(d.mp) ? `<span class="tag" id="tag-${key}">${formatSession(d.mp)}</span>` : `<span class="tag" id="tag-${key}" style="display:none"></span>`)
+          : `<span class="tag crypto-tag">24H Crypto</span>`;
+
+        const bellBadge = activeAlert ? `<span class="tag bell-tag">🔔</span>` : "";
+
+        const subText = asset.type === "STOCK"
+          ? (d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks")
+          : "Binance Spot";
+
+        const prevText = asset.type === "STOCK" && d.pc
+          ? `Prev: $${formatNum(d.pc)}`
+          : "";
+
+        const row = document.createElement("div");
+        row.className = `item ${activeAlert ? "has-alert" : ""} ${idx === activeDragIdx ? "dragging" : ""}`;
+        row.id = `row-${key}`;
+        row.dataset.index = idx;
+        row.innerHTML = `
+          <div class="sym-wrap">
+            <div class="drag-handle" ontouchstart="startTouchDrag(event, ${idx})" title="اسحب للتحريك">⋮⋮</div>
+            <div class="edit-controls">
+              <button class="move-btn" onclick="moveAsset(${idx}, -1)" ${idx === 0 ? "disabled" : ""}>▲</button>
+              <button class="move-btn" onclick="moveAsset(${idx}, 1)" ${idx === assets.length - 1 ? "disabled" : ""}>▼</button>
+            </div>
+            <button class="del-btn" onclick="removeAsset('${asset.sym}', '${asset.type}')">حذف</button>
+            <div>
+              <div class="sym">
+                <span class="sym-click" onclick="openTvModal('${asset.sym}', '${asset.type}')">${asset.sym}</span>
+                ${extraTag}
+                ${bellBadge}
+              </div>
+              <div class="sub" id="sub-${key}">${subText}</div>
+              <div class="pos-sub" id="pnl-${key}">${pnl ? formatPnlHtml(pnl) : ""}</div>
+            </div>
+          </div>
+          <div class="price-col">
+            <div class="price" id="price-${key}">${price ? "$" + formatNum(price) : "---"}</div>
+            <div class="prev" id="prev-${key}">${prevText}</div>
+          </div>
+          <div class="chg-col">
+            <div class="badge ${badgeClass}" id="badge-${key}">
+              ${price ? sign + chg.toFixed(2) + "%" : "0.00%"}
+            </div>
+          </div>
+        `;
+        listEl.appendChild(row);
+        if (idx === activeDragIdx) {
+          dragState.rowEl = row;
+        }
+      });
+    }
+
+    function updateRowUI(key, oldPrice) {
+      const d = marketData[key];
+      if (!d) return;
+
+      const priceEl = document.getElementById(`price-${key}`);
+      const badgeEl = document.getElementById(`badge-${key}`);
+      const prevEl = document.getElementById(`prev-${key}`);
+      const subEl = document.getElementById(`sub-${key}`);
+      const tagEl = document.getElementById(`tag-${key}`);
+      const pnlEl = document.getElementById(`pnl-${key}`);
+      const rowEl = document.getElementById(`row-${key}`);
+      if (!priceEl) return;
+
+      const price = parseFloat(d.price);
+      if (price) {
+        priceEl.textContent = "$" + formatNum(price);
+        checkAlerts(key, price);
+        if (pnlEl) {
+          const pnl = calcAssetPnl(key, price);
+          pnlEl.innerHTML = pnl ? formatPnlHtml(pnl) : "";
+        }
+        updateTotalPnl();
+      }
+
+      if (d.pc && prevEl) prevEl.textContent = "Prev: $" + formatNum(d.pc);
+      if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
+
+      if (d.mp && tagEl) {
+        const sText = formatSession(d.mp);
+        if (sText) {
+          tagEl.style.display = "inline-block";
+          tagEl.textContent = sText;
+        }
+      }
+
+      if (badgeEl && d.chg !== undefined && !isNaN(parseFloat(d.chg))) {
+        const chg = parseFloat(d.chg);
+        const isUp = chg > 0;
+        const isDown = chg < 0;
+        badgeEl.className = "badge " + (isUp ? "up" : (isDown ? "down" : ""));
+        badgeEl.textContent = (isUp ? "+" : "") + chg.toFixed(2) + "%";
+      }
+
+      if (oldPrice && price && price !== parseFloat(oldPrice) && rowEl) {
+        const cls = price > parseFloat(oldPrice) ? "flash-up" : "flash-down";
+        rowEl.classList.add(cls);
+        setTimeout(() => rowEl.classList.remove(cls), 280);
+      }
+    }
+
+    function updateStatus() {
+      const hasStocks = assets.some(a => a.type === "STOCK");
+      const hasCrypto = assets.some(a => a.type === "CRYPTO");
+      const eqOk = !hasStocks || (eqSocket && eqSocket.readyState === WebSocket.OPEN);
+      const crOk = !hasCrypto || (cryptoSocket && cryptoSocket.readyState === WebSocket.OPEN);
+
+      if (eqOk && crOk) {
+        dotEl.classList.add("live");
+        statusText.textContent = "متصل لحظياً ببث بايننس";
+      } else {
+        dotEl.classList.remove("live");
+        statusText.textContent = "جاري مزامنة الاتصالات...";
+      }
+    }
+
+    function connectEquity() {
+      if (eqSocket) eqSocket.close();
+      clearTimeout(eqTimer);
+      const stockSyms = assets.filter(a => a.type === "STOCK").map(a => a.sym);
+      if (!stockSyms.length) return updateStatus();
+
+      eqSocket = new WebSocket("wss://nbstream.binance.com/equity/stream");
+      eqSocket.onopen = () => {
+        updateStatus();
+        eqSocket.send(JSON.stringify({
+          method: "SUBSCRIBE",
+          params: ["price", ...stockSyms.map(s => `${s}@quote`)],
+          id: 1
+        }));
+      };
+      eqSocket.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        const data = payload.data || payload;
+
+        if (data.e === "price" && Array.isArray(data.rates)) {
+          data.rates.forEach(item => {
+            if (!stockSyms.includes(item.s)) return;
+            const key = `STOCK:${item.s}`;
+            const prevPrice = marketData[key]?.price;
+            const pc = item.pc || item.lrc || marketData[key]?.pc;
+            const bid = marketData[key]?.bid;
+            const ask = marketData[key]?.ask;
+            const p = item.p || ((bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : prevPrice);
+            const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
+            marketData[key] = { ...marketData[key], price: p, pc, mp: item.mp || marketData[key]?.mp, chg };
+            updateRowUI(key, prevPrice);
+          });
+          scheduleSaveMarketCache();
+        }
+
+        if (data.s && (data.bp || data.ap || data.p || data.pc || data.lrc)) {
+          if (!stockSyms.includes(data.s)) return;
+          const key = `STOCK:${data.s}`;
+          const prevPrice = marketData[key]?.price;
+          const bid = data.bp || marketData[key]?.bid;
+          const ask = data.ap || marketData[key]?.ask;
+          const mid = (bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : null;
+          const p = data.p || mid || prevPrice;
+          const pc = data.pc || data.lrc || marketData[key]?.pc;
+          const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
+          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, mp: data.mp || marketData[key]?.mp, chg };
+          updateRowUI(key, prevPrice);
+          scheduleSaveMarketCache();
+        }
+      };
+      eqSocket.onclose = () => {
+        updateStatus();
+        eqTimer = setTimeout(connectEquity, 2500);
+      };
+    }
+
+    function connectCrypto() {
+      if (cryptoSocket) cryptoSocket.close();
+      clearTimeout(cryptoTimer);
+      const cryptoSyms = assets.filter(a => a.type === "CRYPTO").map(a => a.sym.toLowerCase());
+      if (!cryptoSyms.length) return updateStatus();
+
+      const streams = cryptoSyms.map(s => `${s}@miniTicker`).join("/");
+      cryptoSocket = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+
+      cryptoSocket.onopen = () => updateStatus();
+      cryptoSocket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        const d = msg.data;
+        if (!d || !d.s) return;
+        const key = `CRYPTO:${d.s}`;
+        const prevPrice = marketData[key]?.price;
+        const closePrice = parseFloat(d.c);
+        const openPrice = parseFloat(d.o);
+        const chg = openPrice ? ((closePrice - openPrice) / openPrice) * 100 : 0;
+        marketData[key] = { ...marketData[key], price: closePrice, chg };
+        updateRowUI(key, prevPrice);
+        scheduleSaveMarketCache();
+      };
+      cryptoSocket.onclose = () => {
+        updateStatus();
+        cryptoTimer = setTimeout(connectCrypto, 2500);
+      };
+    }
+
+    applyTheme(savedTheme);
+    updateSoundButton();
+    populateSelect("posAssetSelect");
+    populateSelect("alertAssetSelect");
+    renderList();
+    renderPositions();
+    renderAlerts();
+    updateTotalPnl();
+    connectEquity();
+    connectCrypto();
+  </script>
+</body>
+</html>
