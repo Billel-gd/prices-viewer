@@ -48,11 +48,11 @@
       padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
     }
     .header-top {
-      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px;
     }
-    .menu-slot { display: flex; justify-content: flex-start; }
-    .center-slot { display: flex; justify-content: center; align-items: center; }
-    .timer-slot { display: flex; justify-content: flex-end; }
+    .menu-slot { display: flex; justify-content: flex-start; align-items: center; }
+    .center-slot { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; }
+    .timer-slot { display: flex; justify-content: flex-end; align-items: center; }
     .icon-only-btn {
       width: 34px; height: 32px; padding: 0;
       display: inline-flex; align-items: center; justify-content: center;
@@ -61,6 +61,22 @@
 
     .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
     .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    .pnl-chevron-btn {
+      background: transparent; border: none; color: var(--muted);
+      width: 24px; height: 18px;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0; transition: color 0.15s ease;
+    }
+    .pnl-chevron-btn:hover { color: var(--text); }
+    .pnl-chevron-btn svg {
+      width: 14px; height: 14px;
+      transition: transform 0.2s ease;
+      transform: rotate(0deg);
+    }
+    .pnl-chevron-btn.flipped svg {
+      transform: rotate(180deg);
+    }
 
     .session-timer {
       display: inline-flex; align-items: center; gap: 6px;
@@ -105,16 +121,7 @@
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
       padding: 8px 12px; margin-bottom: 10px; font-size: 12px; direction: ltr;
     }
-    .summary-right { display: flex; align-items: center; gap: 8px; }
-    .pnl-toggle-btn {
-      background: transparent; border: 1px solid var(--border); color: var(--muted);
-      border-radius: 5px; padding: 2px 6px; font-size: 10px; font-weight: 600; cursor: pointer;
-    }
-    .pnl-toggle-btn:hover { color: var(--text); border-color: var(--accent); }
-    .summary-bar.collapsed {
-      padding: 5px 12px;
-    }
-    .summary-bar.collapsed .summary-content {
+    .summary-bar.hidden-frame {
       display: none;
     }
     .pnl-pos { color: var(--green); font-weight: 700; }
@@ -297,6 +304,11 @@
       </div>
       <div class="center-slot">
         <span class="dot" id="statusDot"></span>
+        <button class="pnl-chevron-btn" id="pnlToggleBtn" onclick="togglePnlSummary()" aria-label="تبديل إطار P&L" title="تبديل إطار P&L">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
       </div>
       <div class="timer-slot">
         <div class="session-timer sess-closed" id="nextSessionTimer" title="الوقت المتبقي حتى الجلسة التالية (ET)">
@@ -323,11 +335,8 @@
   </div>
 
   <div class="summary-bar" id="portfolioSummary">
-    <span class="summary-content" style="color:var(--muted);">Total Unrealized P&L:</span>
-    <div class="summary-right">
-      <span class="summary-content pnl-flat" id="totalPnlText">$0.00 (0.00%)</span>
-      <button class="pnl-toggle-btn" id="pnlToggleBtn" onclick="togglePnlSummary()" title="إظهار / إخفاء ملخص P&L">إخفاء</button>
-    </div>
+    <span style="color:var(--muted);">Total Unrealized P&L:</span>
+    <span class="pnl-flat" id="totalPnlText">$0.00 (0.00%)</span>
   </div>
 
   <div class="panel" id="mainPanel">
@@ -497,9 +506,8 @@
 
     function applyPnlSummaryState() {
       if (!summaryBar || !pnlToggleBtn) return;
-      summaryBar.classList.toggle("collapsed", pnlSummaryHidden);
-      pnlToggleBtn.textContent = pnlSummaryHidden ? "إظهار" : "إخفاء";
-      pnlToggleBtn.title = pnlSummaryHidden ? "إظهار ملخص P&L" : "إخفاء ملخص P&L";
+      summaryBar.classList.toggle("hidden-frame", pnlSummaryHidden);
+      pnlToggleBtn.classList.toggle("flipped", pnlSummaryHidden);
     }
 
     function togglePnlSummary() {
@@ -1111,15 +1119,14 @@
       });
 
       if (!hasAny) {
-        totalEl.className = "summary-content pnl-flat";
+        totalEl.className = "pnl-flat";
         totalEl.textContent = "$0.00 (0.00%)";
         return;
       }
 
       const totalPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
       const sign = totalPnl > 0 ? "+" : "";
-      const cls = totalPnl > 0 ? "pnl-pos" : (totalPnl < 0 ? "pnl-neg" : "pnl-flat");
-      totalEl.className = `summary-content ${cls}`;
+      totalEl.className = totalPnl > 0 ? "pnl-pos" : (totalPnl < 0 ? "pnl-neg" : "pnl-flat");
       totalEl.textContent = `${sign}$${formatNum(totalPnl)} (${sign}${totalPct.toFixed(2)}%)`;
     }
 
