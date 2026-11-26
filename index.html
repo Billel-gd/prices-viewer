@@ -52,7 +52,22 @@
     .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); display: inline-block; }
     .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
-    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .session-timer {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      padding: 4px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; direction: ltr;
+      font-variant-numeric: tabular-nums;
+    }
+    .session-timer .next-lbl { color: var(--muted); font-weight: 600; }
+    .session-timer .cd-val { color: var(--accent); font-weight: 700; }
+    .session-timer.sess-pre { border-color: rgba(245, 158, 11, 0.45); color: #f59e0b; }
+    .session-timer.sess-open { border-color: rgba(16, 185, 129, 0.45); color: #10b981; }
+    .session-timer.sess-post { border-color: rgba(168, 85, 247, 0.45); color: #a855f7; }
+    .session-timer.sess-night { border-color: rgba(59, 130, 246, 0.45); color: #3b82f6; }
+    .session-timer.sess-closed { border-color: rgba(156, 163, 175, 0.4); color: #9ca3af; }
+
+    .actions { width: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
     .btn {
       background: var(--card); color: var(--text); border: 1px solid var(--border);
       padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600;
@@ -181,7 +196,7 @@
       background: var(--tag-bg); color: var(--accent); font-weight: 600;
       display: inline-flex; align-items: center; gap: 4px; line-height: 1.1;
     }
-    .tag svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .tag svg, .session-timer svg { width: 12px; height: 12px; flex-shrink: 0; }
     .tag.sess-pre { color: #f59e0b; }
     .tag.sess-open { color: #10b981; }
     .tag.sess-post { color: #a855f7; }
@@ -253,6 +268,11 @@
     <div class="title">
       <span class="dot" id="statusDot"></span>
       <span>مراقب الأسعار</span>
+    </div>
+    <div class="session-timer sess-closed" id="nextSessionTimer" title="الوقت المتبقي حتى الجلسة التالية (ET)">
+      <span id="nextSessIcon"></span>
+      <span class="next-lbl" id="nextSessLabel">Pre-Mkt</span>
+      <span class="cd-val" id="nextSessCountdown">--:--:--</span>
     </div>
     <div class="actions">
       <button class="btn btn-accent" onclick="openPanel('asset')">+ إضافة</button>
@@ -1189,6 +1209,113 @@
       return `<span class="tag ${m.cls}" id="tag-${key}">${m.svg}<span>${m.label}</span></span>`;
     }
 
+    const ET_PARTS_FMT = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday: "short",
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+
+    const WEEKDAY_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+    function getEtWallTime(nowDate) {
+      const parts = ET_PARTS_FMT.formatToParts(nowDate);
+      const map = {};
+      parts.forEach(p => { map[p.type] = p.value; });
+      return {
+        day: WEEKDAY_MAP[map.weekday] ?? 0,
+        year: parseInt(map.year, 10),
+        month: parseInt(map.month, 10),
+        date: parseInt(map.day, 10),
+        hour: parseInt(map.hour, 10) % 24,
+        minute: parseInt(map.minute, 10),
+        second: parseInt(map.second, 10)
+      };
+    }
+
+    function getNextSessionInfo(nowMs) {
+      const et = getEtWallTime(new Date(nowMs));
+      const secOfDay = et.hour * 3600 + et.minute * 60 + et.second;
+      const d = et.day;
+
+      let nextCode = "P";
+      let deltaDays = 0;
+      let targetSecOfDay = 4 * 3600;
+
+      if (d >= 1 && d <= 5) {
+        if (secOfDay < 4 * 3600) {
+          nextCode = "P";
+          deltaDays = 0;
+          targetSecOfDay = 4 * 3600;
+        } else if (secOfDay < 9 * 3600 + 30 * 60) {
+          nextCode = "R";
+          deltaDays = 0;
+          targetSecOfDay = 9 * 3600 + 30 * 60;
+        } else if (secOfDay < 16 * 3600) {
+          nextCode = "A";
+          deltaDays = 0;
+          targetSecOfDay = 16 * 3600;
+        } else if (secOfDay < 20 * 3600) {
+          nextCode = d === 5 ? "C" : "O";
+          deltaDays = 0;
+          targetSecOfDay = 20 * 3600;
+        } else {
+          nextCode = "P";
+          deltaDays = d === 5 ? 2 : 1;
+          targetSecOfDay = 4 * 3600;
+        }
+      } else if (d === 6) {
+        nextCode = "P";
+        deltaDays = 1;
+        targetSecOfDay = 4 * 3600;
+      } else {
+        if (secOfDay < 20 * 3600) {
+          nextCode = "O";
+          deltaDays = 0;
+          targetSecOfDay = 20 * 3600;
+        } else {
+          nextCode = "P";
+          deltaDays = 1;
+          targetSecOfDay = 4 * 3600;
+        }
+      }
+
+      const diffSec = Math.max(0, deltaDays * 86400 + (targetSecOfDay - secOfDay));
+      return { nextCode, diffSec };
+    }
+
+    function formatCountdown(totalSec) {
+      const days = Math.floor(totalSec / 86400);
+      const rem = totalSec % 86400;
+      const hrs = Math.floor(rem / 3600);
+      const mins = Math.floor((rem % 3600) / 60);
+      const secs = rem % 60;
+      const hh = String(hrs).padStart(2, "0");
+      const mm = String(mins).padStart(2, "0");
+      const ss = String(secs).padStart(2, "0");
+      return days > 0 ? `${days}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
+    }
+
+    function updateNextSessionTimer() {
+      const box = document.getElementById("nextSessionTimer");
+      const iconEl = document.getElementById("nextSessIcon");
+      const lblEl = document.getElementById("nextSessLabel");
+      const cdEl = document.getElementById("nextSessCountdown");
+      if (!box || !iconEl || !lblEl || !cdEl) return;
+
+      const { nextCode, diffSec } = getNextSessionInfo(Date.now());
+      const m = getSessionMeta(nextCode);
+      box.className = `session-timer ${m.cls}`;
+      iconEl.innerHTML = m.svg;
+      lblEl.textContent = m.label;
+      cdEl.textContent = formatCountdown(diffSec);
+    }
+
     function formatNum(num) {
       const n = parseFloat(num);
       if (isNaN(n)) return "---";
@@ -1492,6 +1619,8 @@
     renderPositions();
     renderAlerts();
     updateTotalPnl();
+    updateNextSessionTimer();
+    setInterval(updateNextSessionTimer, 1000);
     connectEquity();
     connectCrypto();
     connectPerp();
