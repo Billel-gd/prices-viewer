@@ -119,14 +119,14 @@
     .backup-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
     .table-head {
-      display: grid; grid-template-columns: 1.35fr 1.05fr 0.95fr;
+      display: grid; grid-template-columns: 1.45fr 1.05fr 0.9fr;
       color: var(--muted); font-size: 11px; padding: 0 6px 8px; direction: ltr;
     }
     .table-head span:nth-child(2), .table-head span:nth-child(3) { text-align: right; }
 
     .list { display: flex; flex-direction: column; gap: 6px; direction: ltr; }
     .item {
-      display: grid; grid-template-columns: 1.35fr 1.05fr 0.95fr; align-items: center;
+      display: grid; grid-template-columns: 1.45fr 1.05fr 0.9fr; align-items: center;
       background: var(--card); border: 1px solid var(--border); padding: 11px 10px; border-radius: 8px;
       transition: background-color 0.25s ease, transform 0.12s ease, box-shadow 0.12s ease;
       position: relative;
@@ -177,9 +177,16 @@
 
     .sym { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
     .tag {
-      font-size: 10px; padding: 1px 6px; border-radius: 4px;
-      background: var(--tag-bg); color: var(--accent); font-weight: 700;
+      font-size: 10px; padding: 2px 6px; border-radius: 4px;
+      background: var(--tag-bg); color: var(--accent); font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px; line-height: 1.1;
     }
+    .tag svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .tag.sess-pre { color: #f59e0b; }
+    .tag.sess-open { color: #10b981; }
+    .tag.sess-post { color: #a855f7; }
+    .tag.sess-night { color: #3b82f6; }
+    .tag.sess-closed { color: #9ca3af; }
     .tag.crypto-tag { color: #38bdf8; }
     .tag.perp-tag { color: #c084fc; }
     .tag.bell-tag { color: var(--green); }
@@ -1145,15 +1152,41 @@
       return alerts.some(a => a.assetKey === key && !a.triggered);
     }
 
-    function formatSession(mp) {
-      const map = {
-        "R": "☀ Regular",
-        "P": "🌞 Pre",
-        "A": "🌤 After",
-        "O": "🌙 24/5 NIGHT",
-        "C": "🔒 Closed"
-      };
-      return map[mp] || "🔒 Closed";
+    const SESSION_META = {
+      "P": {
+        cls: "sess-pre",
+        label: "Pre-Mkt",
+        svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M5.6 7.6l2.1 2.1"/><path d="M18.4 7.6l-2.1 2.1"/><path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/></svg>`
+      },
+      "R": {
+        cls: "sess-open",
+        label: "Mkt Open",
+        svg: `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6.5"/></svg>`
+      },
+      "A": {
+        cls: "sess-post",
+        label: "Post-Mkt",
+        svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M12 6v3"/><path d="M7.5 10.5l1.5 1.5"/><path d="M16.5 10.5l-1.5 1.5"/></svg>`
+      },
+      "O": {
+        cls: "sess-night",
+        label: "Overnight",
+        svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
+      },
+      "C": {
+        cls: "sess-closed",
+        label: "Mkt Closed",
+        svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
+      }
+    };
+
+    function getSessionMeta(mp) {
+      return SESSION_META[mp] || SESSION_META["C"];
+    }
+
+    function renderSessionTagHtml(key, mp) {
+      const m = getSessionMeta(mp);
+      return `<span class="tag ${m.cls}" id="tag-${key}">${m.svg}<span>${m.label}</span></span>`;
     }
 
     function formatNum(num) {
@@ -1180,7 +1213,7 @@
         let extraTag = "";
         let subText = "";
         if (asset.type === "STOCK") {
-          extraTag = `<span class="tag" id="tag-${key}">${formatSession(d.mp)}</span>`;
+          extraTag = renderSessionTagHtml(key, d.mp);
           subText = d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks";
         } else if (asset.type === "PERP") {
           extraTag = `<span class="tag perp-tag">24H Perp</span>`;
@@ -1263,8 +1296,9 @@
       if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
 
       if (tagEl) {
-        tagEl.style.display = "inline-block";
-        tagEl.textContent = formatSession(d.mp);
+        const m = getSessionMeta(d.mp);
+        tagEl.className = `tag ${m.cls}`;
+        tagEl.innerHTML = `${m.svg}<span>${m.label}</span>`;
       }
 
       if (badgeEl && d.chg !== undefined && !isNaN(parseFloat(d.chg))) {
