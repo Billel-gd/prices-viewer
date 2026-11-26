@@ -53,6 +53,11 @@
     .menu-slot { display: flex; justify-content: flex-start; }
     .center-slot { display: flex; justify-content: center; align-items: center; }
     .timer-slot { display: flex; justify-content: flex-end; }
+    .icon-only-btn {
+      width: 34px; height: 32px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 16px; line-height: 1;
+    }
 
     .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
     .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
@@ -99,6 +104,18 @@
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
       padding: 8px 12px; margin-bottom: 10px; font-size: 12px; direction: ltr;
+    }
+    .summary-right { display: flex; align-items: center; gap: 8px; }
+    .pnl-toggle-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 5px; padding: 2px 6px; font-size: 10px; font-weight: 600; cursor: pointer;
+    }
+    .pnl-toggle-btn:hover { color: var(--text); border-color: var(--accent); }
+    .summary-bar.collapsed {
+      padding: 5px 12px;
+    }
+    .summary-bar.collapsed .summary-content {
+      display: none;
     }
     .pnl-pos { color: var(--green); font-weight: 700; }
     .pnl-neg { color: var(--red); font-weight: 700; }
@@ -276,7 +293,7 @@
   <header>
     <div class="header-top">
       <div class="menu-slot">
-        <button class="btn" id="menuToggleBtn" onclick="toggleMenu()">☰ قائمة</button>
+        <button class="btn icon-only-btn" id="menuToggleBtn" onclick="toggleMenu()" aria-label="القائمة" title="القائمة">☰</button>
       </div>
       <div class="center-slot">
         <span class="dot" id="statusDot"></span>
@@ -306,8 +323,11 @@
   </div>
 
   <div class="summary-bar" id="portfolioSummary">
-    <span style="color:var(--muted);">Total Unrealized P&L:</span>
-    <span class="pnl-flat" id="totalPnlText">$0.00 (0.00%)</span>
+    <span class="summary-content" style="color:var(--muted);">Total Unrealized P&L:</span>
+    <div class="summary-right">
+      <span class="summary-content pnl-flat" id="totalPnlText">$0.00 (0.00%)</span>
+      <button class="pnl-toggle-btn" id="pnlToggleBtn" onclick="togglePnlSummary()" title="إظهار / إخفاء ملخص P&L">إخفاء</button>
+    </div>
   </div>
 
   <div class="panel" id="mainPanel">
@@ -431,6 +451,7 @@
     let hideSideToolbar = JSON.parse(localStorage.getItem("watch_hide_toolbar_v1") ?? "false");
     let customTfList = JSON.parse(localStorage.getItem("watch_tf_list_v1")) || DEFAULT_TF_LIST;
     let activeTvInterval = localStorage.getItem("watch_active_tf_v1") || "15";
+    let pnlSummaryHidden = JSON.parse(localStorage.getItem("watch_pnl_summary_hidden_v1") ?? "false");
 
     let marketData = JSON.parse(localStorage.getItem("watch_market_cache_v1") || "{}");
     let cacheSaveTimer = null;
@@ -471,6 +492,21 @@
     const themeBtn = document.getElementById("themeBtn");
     const soundBtn = document.getElementById("soundToggleBtn");
     const editBtn = document.getElementById("editBtn");
+    const summaryBar = document.getElementById("portfolioSummary");
+    const pnlToggleBtn = document.getElementById("pnlToggleBtn");
+
+    function applyPnlSummaryState() {
+      if (!summaryBar || !pnlToggleBtn) return;
+      summaryBar.classList.toggle("collapsed", pnlSummaryHidden);
+      pnlToggleBtn.textContent = pnlSummaryHidden ? "إظهار" : "إخفاء";
+      pnlToggleBtn.title = pnlSummaryHidden ? "إظهار ملخص P&L" : "إخفاء ملخص P&L";
+    }
+
+    function togglePnlSummary() {
+      pnlSummaryHidden = !pnlSummaryHidden;
+      localStorage.setItem("watch_pnl_summary_hidden_v1", JSON.stringify(pnlSummaryHidden));
+      applyPnlSummaryState();
+    }
 
     function toggleMenu() {
       unlockAudio();
@@ -741,7 +777,8 @@
           watch_sound_v1: soundEnabled,
           watch_hide_toolbar_v1: hideSideToolbar,
           watch_tf_list_v1: customTfList,
-          watch_active_tf_v1: activeTvInterval
+          watch_active_tf_v1: activeTvInterval,
+          watch_pnl_summary_hidden_v1: pnlSummaryHidden
         }
       };
 
@@ -793,6 +830,7 @@
           hideSideToolbar = typeof data.watch_hide_toolbar_v1 === "boolean" ? data.watch_hide_toolbar_v1 : hideSideToolbar;
           customTfList = Array.isArray(data.watch_tf_list_v1) ? data.watch_tf_list_v1 : customTfList;
           activeTvInterval = data.watch_active_tf_v1 || activeTvInterval;
+          pnlSummaryHidden = typeof data.watch_pnl_summary_hidden_v1 === "boolean" ? data.watch_pnl_summary_hidden_v1 : pnlSummaryHidden;
 
           localStorage.setItem("watch_assets_v1", JSON.stringify(assets));
           localStorage.setItem("watch_alerts_v1", JSON.stringify(alerts));
@@ -802,8 +840,10 @@
           localStorage.setItem("watch_hide_toolbar_v1", JSON.stringify(hideSideToolbar));
           localStorage.setItem("watch_tf_list_v1", JSON.stringify(customTfList));
           localStorage.setItem("watch_active_tf_v1", activeTvInterval);
+          localStorage.setItem("watch_pnl_summary_hidden_v1", JSON.stringify(pnlSummaryHidden));
 
           applyTheme(savedTheme);
+          applyPnlSummaryState();
           updateSoundButton();
           populateSelect("posAssetSelect");
           populateSelect("alertAssetSelect");
@@ -1071,14 +1111,15 @@
       });
 
       if (!hasAny) {
-        totalEl.className = "pnl-flat";
+        totalEl.className = "summary-content pnl-flat";
         totalEl.textContent = "$0.00 (0.00%)";
         return;
       }
 
       const totalPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
       const sign = totalPnl > 0 ? "+" : "";
-      totalEl.className = totalPnl > 0 ? "pnl-pos" : (totalPnl < 0 ? "pnl-neg" : "pnl-flat");
+      const cls = totalPnl > 0 ? "pnl-pos" : (totalPnl < 0 ? "pnl-neg" : "pnl-flat");
+      totalEl.className = `summary-content ${cls}`;
       totalEl.textContent = `${sign}$${formatNum(totalPnl)} (${sign}${totalPct.toFixed(2)}%)`;
     }
 
@@ -1637,6 +1678,7 @@
     }
 
     applyTheme(savedTheme);
+    applyPnlSummaryState();
     updateSoundButton();
     populateSelect("posAssetSelect");
     populateSelect("alertAssetSelect");
