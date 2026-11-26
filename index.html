@@ -45,11 +45,16 @@
     }
 
     header {
-      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
       padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px;
     }
-    .title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red); display: inline-block; }
+    .header-top {
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+    }
+    .menu-slot { display: flex; justify-content: flex-start; }
+    .center-slot { display: flex; justify-content: center; align-items: center; }
+    .timer-slot { display: flex; justify-content: flex-end; }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; }
     .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
     .session-timer {
@@ -67,7 +72,11 @@
     .session-timer.sess-night { border-color: rgba(59, 130, 246, 0.45); color: #3b82f6; }
     .session-timer.sess-closed { border-color: rgba(156, 163, 175, 0.4); color: #9ca3af; }
 
-    .actions { width: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+    .actions {
+      display: none; gap: 6px; flex-wrap: wrap;
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+    }
+    .actions.show { display: flex; }
     .btn {
       background: var(--card); color: var(--text); border: 1px solid var(--border);
       padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600;
@@ -265,16 +274,22 @@
 <body>
 
   <header>
-    <div class="title">
-      <span class="dot" id="statusDot"></span>
-      <span>مراقب الأسعار</span>
+    <div class="header-top">
+      <div class="menu-slot">
+        <button class="btn" id="menuToggleBtn" onclick="toggleMenu()">☰ قائمة</button>
+      </div>
+      <div class="center-slot">
+        <span class="dot" id="statusDot"></span>
+      </div>
+      <div class="timer-slot">
+        <div class="session-timer sess-closed" id="nextSessionTimer" title="الوقت المتبقي حتى الجلسة التالية (ET)">
+          <span id="nextSessIcon"></span>
+          <span class="next-lbl" id="nextSessLabel">Pre-Mkt</span>
+          <span class="cd-val" id="nextSessCountdown">--:--:--</span>
+        </div>
+      </div>
     </div>
-    <div class="session-timer sess-closed" id="nextSessionTimer" title="الوقت المتبقي حتى الجلسة التالية (ET)">
-      <span id="nextSessIcon"></span>
-      <span class="next-lbl" id="nextSessLabel">Pre-Mkt</span>
-      <span class="cd-val" id="nextSessCountdown">--:--:--</span>
-    </div>
-    <div class="actions">
+    <div class="actions" id="menuDrawer">
       <button class="btn btn-accent" onclick="openPanel('asset')">+ إضافة</button>
       <button class="btn" onclick="openPanel('portfolio')">💼 محفظة</button>
       <button class="btn" onclick="openPanel('alert')">🔔 تنبيه</button>
@@ -439,6 +454,7 @@
 
     let currentTvSymbol = "BINANCE:BTCUSDT";
     let tvModalOpen = false;
+    let menuOpen = false;
 
     let dragState = {
       active: false,
@@ -450,9 +466,18 @@
     const dotEl = document.getElementById("statusDot");
     const statusText = document.getElementById("statusText");
     const mainPanel = document.getElementById("mainPanel");
+    const menuDrawer = document.getElementById("menuDrawer");
+    const menuToggleBtn = document.getElementById("menuToggleBtn");
     const themeBtn = document.getElementById("themeBtn");
     const soundBtn = document.getElementById("soundToggleBtn");
     const editBtn = document.getElementById("editBtn");
+
+    function toggleMenu() {
+      unlockAudio();
+      menuOpen = !menuOpen;
+      menuDrawer.classList.toggle("show", menuOpen);
+      menuToggleBtn.classList.toggle("active-mode", menuOpen);
+    }
 
     function getTypeLabel(type) {
       if (type === "STOCK") return "سهم";
