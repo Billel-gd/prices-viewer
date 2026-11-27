@@ -1808,7 +1808,7 @@
       }
 
       if (ev && ev.type === "CLOSED") {
-        return secOfDay >= 20 * 3600 ? "O" : "C";
+        return "C";
       }
 
       const isEarlyClose = ev && ev.type === "EARLY_CLOSE";
@@ -1819,8 +1819,8 @@
       if (secOfDay < 9 * 3600 + 30 * 60) return "P";
       if (secOfDay < closeSec) return "R";
       if (secOfDay < postEndSec) return "A";
-      if (isEarlyClose) return secOfDay < 20 * 3600 ? "C" : (dow === 5 ? "C" : "O");
-      return dow === 5 ? "C" : "O";
+      if (dow === 5) return "C";
+      return "O";
     }
 
     function getNextSessionInfo(nowMs) {
@@ -1838,21 +1838,26 @@
         const closeSec = isEarlyClose && ev.earlyCloseSec ? ev.earlyCloseSec : 16 * 3600;
         const postEndSec = isEarlyClose && ev.postCloseSec ? ev.postCloseSec : 20 * 3600;
 
-        if (dow >= 1 && dow <= 5 && !isClosedWeekday) {
-          const candidates = isEarlyClose
-            ? [
-                { code: "P", sec: 4 * 3600 },
-                { code: "R", sec: 9 * 3600 + 30 * 60 },
-                { code: "A", sec: closeSec },
-                { code: "C", sec: postEndSec },
-                { code: "O", sec: 20 * 3600 }
-              ]
-            : [
-                { code: "P", sec: 4 * 3600 },
-                { code: "R", sec: 9 * 3600 + 30 * 60 },
-                { code: "A", sec: closeSec },
-                { code: "O", sec: 20 * 3600 }
-              ];
+        if (dow >= 1 && dow <= 4 && !isClosedWeekday) {
+          const candidates = [
+            { code: "P", sec: 4 * 3600 },
+            { code: "R", sec: 9 * 3600 + 30 * 60 },
+            { code: "A", sec: closeSec },
+            { code: "O", sec: 20 * 3600 }
+          ];
+          for (const c of candidates) {
+            const totalOffsetSec = offset * 86400 + (c.sec - secOfDay);
+            if (totalOffsetSec > 0) {
+              return { currentCode, nextCode: c.code, diffSec: totalOffsetSec };
+            }
+          }
+        } else if (dow === 5 && !isClosedWeekday) {
+          // Friday: no Overnight session into weekend; next session after Post-Mkt is Monday Pre-Mkt
+          const candidates = [
+            { code: "P", sec: 4 * 3600 },
+            { code: "R", sec: 9 * 3600 + 30 * 60 },
+            { code: "A", sec: closeSec }
+          ];
           for (const c of candidates) {
             const totalOffsetSec = offset * 86400 + (c.sec - secOfDay);
             if (totalOffsetSec > 0) {
