@@ -2051,10 +2051,8 @@
           ? `Prev: $${formatNum(d.pc)}`
           : "";
 
-        const volFormatted = formatVolume(d.vol);
-        const volText = volFormatted
-          ? (asset.type === "STOCK" ? `Vol: ${volFormatted}` : `Vol: $${volFormatted}`)
-          : "";
+        const volFormatted = asset.type !== "STOCK" ? formatVolume(d.vol) : "";
+        const volText = volFormatted ? `Vol: $${volFormatted}` : "";
 
         const row = document.createElement("div");
         row.className = `item ${activeAlert ? "has-alert" : ""} ${idx === activeDragIdx ? "dragging" : ""}`;
@@ -2124,10 +2122,8 @@
 
       if (d.pc && prevEl) prevEl.textContent = "Prev: $" + formatNum(d.pc);
       if (volEl) {
-        const volFormatted = formatVolume(d.vol);
-        volEl.textContent = volFormatted
-          ? (isStock ? `Vol: ${volFormatted}` : `Vol: $${volFormatted}`)
-          : "";
+        const volFormatted = !isStock ? formatVolume(d.vol) : "";
+        volEl.textContent = volFormatted ? `Vol: $${volFormatted}` : "";
       }
       if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
 
@@ -2198,15 +2194,14 @@
             const bid = marketData[key]?.bid;
             const ask = marketData[key]?.ask;
             const p = item.p || ((bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : prevPrice);
-            const vol = item.v || item.q || marketData[key]?.vol;
             const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
-            marketData[key] = { ...marketData[key], price: p, pc, vol, chg };
+            marketData[key] = { ...marketData[key], price: p, pc, chg };
             updateRowUI(key, prevPrice);
           });
           scheduleSaveMarketCache();
         }
 
-        if (data.s && (data.bp || data.ap || data.p || data.pc || data.lrc || data.v || data.q)) {
+        if (data.s && (data.bp || data.ap || data.p || data.pc || data.lrc)) {
           if (!stockSyms.includes(data.s)) return;
           const key = `STOCK:${data.s}`;
           const prevPrice = marketData[key]?.price;
@@ -2215,9 +2210,8 @@
           const mid = (bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : null;
           const p = data.p || mid || prevPrice;
           const pc = data.pc || data.lrc || marketData[key]?.pc;
-          const vol = data.v || data.q || marketData[key]?.vol;
           const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
-          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, vol, chg };
+          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, chg };
           updateRowUI(key, prevPrice);
           scheduleSaveMarketCache();
         }
