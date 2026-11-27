@@ -523,8 +523,8 @@
       "2026-07-03": { type: "CLOSED", name: "Independence Day (Observed)" },
       "2026-09-07": { type: "CLOSED", name: "Labor Day" },
       "2026-11-26": { type: "CLOSED", name: "Thanksgiving Day" },
-      "2026-11-27": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close" },
-      "2026-12-24": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Christmas Eve Early Close" },
+      "2026-11-27": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, postCloseSec: 17 * 3600, name: "Early Close" },
+      "2026-12-24": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, postCloseSec: 17 * 3600, name: "Christmas Eve Early Close" },
       "2026-12-25": { type: "CLOSED", name: "Christmas Day" },
 
       "2027-01-01": { type: "CLOSED", name: "New Year's Day" },
@@ -536,7 +536,7 @@
       "2027-07-05": { type: "CLOSED", name: "Independence Day (Observed)" },
       "2027-09-06": { type: "CLOSED", name: "Labor Day" },
       "2027-11-25": { type: "CLOSED", name: "Thanksgiving Day" },
-      "2027-11-26": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close" },
+      "2027-11-26": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, postCloseSec: 17 * 3600, name: "Early Close" },
       "2027-12-24": { type: "CLOSED", name: "Christmas Day (Observed)" }
     };
 
@@ -924,7 +924,6 @@
       const mm = Math.floor((secOfDay % 3600) / 60);
       const ss = secOfDay % 60;
 
-      // Find exact UTC epoch for (y-m-d hh:mm:ss) in America/New_York
       let utcGuess = Date.UTC(y, m - 1, d, hh, mm, ss);
       for (let i = 0; i < 3; i++) {
         const wall = getEtWallTime(new Date(utcGuess));
@@ -1627,12 +1626,15 @@
         return secOfDay >= 20 * 3600 ? "O" : "C";
       }
 
-      const closeSec = (ev && ev.type === "EARLY_CLOSE" && ev.earlyCloseSec) ? ev.earlyCloseSec : 16 * 3600;
+      const isEarlyClose = ev && ev.type === "EARLY_CLOSE";
+      const closeSec = isEarlyClose && ev.earlyCloseSec ? ev.earlyCloseSec : 16 * 3600;
+      const postEndSec = isEarlyClose && ev.postCloseSec ? ev.postCloseSec : 20 * 3600;
 
       if (secOfDay < 4 * 3600) return "O";
       if (secOfDay < 9 * 3600 + 30 * 60) return "P";
       if (secOfDay < closeSec) return "R";
-      if (secOfDay < 20 * 3600) return "A";
+      if (secOfDay < postEndSec) return "A";
+      if (isEarlyClose) return secOfDay < 20 * 3600 ? "C" : (dow === 5 ? "C" : "O");
       return dow === 5 ? "C" : "O";
     }
 
@@ -1649,14 +1651,23 @@
         const isClosedWeekday = dow >= 1 && dow <= 5 && ev && ev.type === "CLOSED";
         const isEarlyClose = dow >= 1 && dow <= 5 && ev && ev.type === "EARLY_CLOSE";
         const closeSec = isEarlyClose && ev.earlyCloseSec ? ev.earlyCloseSec : 16 * 3600;
+        const postEndSec = isEarlyClose && ev.postCloseSec ? ev.postCloseSec : 20 * 3600;
 
         if (dow >= 1 && dow <= 5 && !isClosedWeekday) {
-          const candidates = [
-            { code: "P", sec: 4 * 3600 },
-            { code: "R", sec: 9 * 3600 + 30 * 60 },
-            { code: "A", sec: closeSec },
-            { code: "O", sec: 20 * 3600 }
-          ];
+          const candidates = isEarlyClose
+            ? [
+                { code: "P", sec: 4 * 3600 },
+                { code: "R", sec: 9 * 3600 + 30 * 60 },
+                { code: "A", sec: closeSec },
+                { code: "C", sec: postEndSec },
+                { code: "O", sec: 20 * 3600 }
+              ]
+            : [
+                { code: "P", sec: 4 * 3600 },
+                { code: "R", sec: 9 * 3600 + 30 * 60 },
+                { code: "A", sec: closeSec },
+                { code: "O", sec: 20 * 3600 }
+              ];
           for (const c of candidates) {
             const totalOffsetSec = offset * 86400 + (c.sec - secOfDay);
             if (totalOffsetSec > 0) {
