@@ -116,6 +116,17 @@
     .toast.show { display: flex; }
     .toast-msg { font-size: 13px; font-weight: 700; }
 
+    .cal-banner {
+      background: var(--card); border: 1px solid var(--border); border-right: 3px solid var(--accent);
+      border-radius: 8px; padding: 8px 11px; margin-bottom: 10px;
+      font-size: 11.5px; line-height: 1.55; display: none;
+    }
+    .cal-banner.show { display: block; }
+    .cal-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 0; }
+    .cal-badge-holiday { color: var(--red); font-weight: 700; }
+    .cal-badge-early { color: var(--accent); font-weight: 700; }
+    .cal-badge-event { color: #38bdf8; font-weight: 700; }
+
     .summary-bar {
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
@@ -146,6 +157,7 @@
       padding: 8px 10px; border-radius: 6px; font-size: 13px; outline: none;
     }
     input { flex: 1; min-width: 100px; direction: ltr; }
+    input.rtl-input { direction: rtl; }
     select { cursor: pointer; }
 
     .sub-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
@@ -322,6 +334,7 @@
       <button class="btn btn-accent" onclick="openPanel('asset')">+ إضافة</button>
       <button class="btn" onclick="openPanel('portfolio')">💼 محفظة</button>
       <button class="btn" onclick="openPanel('alert')">🔔 تنبيه</button>
+      <button class="btn" onclick="openPanel('agenda')">📅 أجندة الأسبوع</button>
       <button class="btn" onclick="openPanel('backup')">💾 نسخ احتياطي</button>
       <button class="btn" onclick="openTvModal('BINANCE:BTCUSDT', 'CRYPTO')">📈 شارت TV</button>
       <button class="btn" id="editBtn" onclick="toggleEdit()">تعديل / ترتيب</button>
@@ -334,6 +347,8 @@
     <button class="btn btn-sm" onclick="dismissToast()">إغلاق</button>
   </div>
 
+  <div class="cal-banner" id="marketCalendarBanner"></div>
+
   <div class="summary-bar" id="portfolioSummary">
     <span style="color:var(--muted);">Total Unrealized P&L:</span>
     <span class="pnl-flat" id="totalPnlText">$0.00 (0.00%)</span>
@@ -344,6 +359,7 @@
       <button class="tab-btn active" id="tabAsset" onclick="switchTab('asset')">إضافة أصل</button>
       <button class="tab-btn" id="tabPortfolio" onclick="switchTab('portfolio')">المحفظة P&L</button>
       <button class="tab-btn" id="tabAlert" onclick="switchTab('alert')">التنبيهات</button>
+      <button class="tab-btn" id="tabAgenda" onclick="switchTab('agenda')">أجندة الأسبوع</button>
       <button class="tab-btn" id="tabBackup" onclick="switchTab('backup')">نسخ احتياطي</button>
     </div>
 
@@ -402,8 +418,33 @@
       </div>
     </div>
 
+    <div id="viewAgenda" style="display:none;">
+      <div style="font-size:12px; color:var(--muted);">أضف بيانات مالية أو أحداث الأسبوع (مثل CPI أو FOMC أو NFP) ليظهر توقيتها مسبقاً:</div>
+      <div class="row-input">
+        <input type="text" class="rtl-input" id="agendaTitleInput" placeholder="اسم الحدث (مثال: CPI / FOMC)" onkeydown="if(event.key==='Enter') addAgendaEvent()" />
+        <input type="date" id="agendaDateInput" />
+        <input type="time" id="agendaTimeInput" />
+        <select id="agendaTzInput">
+          <option value="ET">توقيت ET (نيويورك)</option>
+          <option value="LOCAL">توقيتي المحلي</option>
+        </select>
+      </div>
+      <div class="row-input">
+        <input type="text" class="rtl-input" id="agendaNoteInput" placeholder="ملاحظة مختصرة (اختياري)" onkeydown="if(event.key==='Enter') addAgendaEvent()" />
+        <button class="btn btn-accent" onclick="addAgendaEvent()">+ حفظ في الأجندة</button>
+      </div>
+
+      <div class="sub-section">
+        <div class="sub-title">
+          <span>أحداث الأسبوع المسجلة</span>
+          <span id="agendaCount">0</span>
+        </div>
+        <div class="sub-list" id="agendaList"></div>
+      </div>
+    </div>
+
     <div id="viewBackup" style="display:none;">
-      <div style="font-size:12px; color:var(--muted);">صدّر بياناتك (قائمة المراقبة، المحفظة، التنبيهات، الإعدادات) إلى ملف JSON لحفظها أو نقلها لجهاز آخر:</div>
+      <div style="font-size:12px; color:var(--muted);">صدّر بياناتك (قائمة المراقبة، المحفظة، التنبيهات، أجندة الأسبوع، الإعدادات) إلى ملف JSON لحفظها أو نقلها لجهاز آخر:</div>
       <div class="backup-box" id="backupStatsText"></div>
       <div class="backup-actions">
         <button class="btn btn-accent" onclick="exportBackupJson()">⬇️ تصدير نسخة احتياطية (JSON)</button>
@@ -452,9 +493,37 @@
 
     const DEFAULT_TF_LIST = ["1", "5", "15", "30", "60", "240", "1D", "1W"];
 
+    const US_MARKET_EVENTS = {
+      "2026-01-01": { type: "CLOSED", name: "New Year's Day" },
+      "2026-01-19": { type: "CLOSED", name: "MLK, Jr. Day" },
+      "2026-02-16": { type: "CLOSED", name: "Presidents' Day" },
+      "2026-04-03": { type: "CLOSED", name: "Good Friday" },
+      "2026-05-25": { type: "CLOSED", name: "Memorial Day" },
+      "2026-06-19": { type: "CLOSED", name: "Juneteenth" },
+      "2026-07-03": { type: "CLOSED", name: "Independence Day (Observed)" },
+      "2026-09-07": { type: "CLOSED", name: "Labor Day" },
+      "2026-11-26": { type: "CLOSED", name: "Thanksgiving Day" },
+      "2026-11-27": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close (13:00 ET)" },
+      "2026-12-24": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Christmas Eve Early Close (13:00 ET)" },
+      "2026-12-25": { type: "CLOSED", name: "Christmas Day" },
+
+      "2027-01-01": { type: "CLOSED", name: "New Year's Day" },
+      "2027-01-18": { type: "CLOSED", name: "MLK, Jr. Day" },
+      "2027-02-15": { type: "CLOSED", name: "Presidents' Day" },
+      "2027-03-26": { type: "CLOSED", name: "Good Friday" },
+      "2027-05-31": { type: "CLOSED", name: "Memorial Day" },
+      "2027-06-18": { type: "CLOSED", name: "Juneteenth (Observed)" },
+      "2027-07-05": { type: "CLOSED", name: "Independence Day (Observed)" },
+      "2027-09-06": { type: "CLOSED", name: "Labor Day" },
+      "2027-11-25": { type: "CLOSED", name: "Thanksgiving Day" },
+      "2027-11-26": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close (13:00 ET)" },
+      "2027-12-24": { type: "CLOSED", name: "Christmas Day (Observed)" }
+    };
+
     let assets = JSON.parse(localStorage.getItem("watch_assets_v1")) || DEFAULT_ASSETS;
     let alerts = JSON.parse(localStorage.getItem("watch_alerts_v1")) || [];
     let positions = JSON.parse(localStorage.getItem("watch_positions_v1")) || {};
+    let agendaEvents = JSON.parse(localStorage.getItem("watch_agenda_v1")) || [];
     let savedTheme = localStorage.getItem("watch_theme_v1") || "dark";
     let soundEnabled = JSON.parse(localStorage.getItem("watch_sound_v1") ?? "true");
     let hideSideToolbar = JSON.parse(localStorage.getItem("watch_hide_toolbar_v1") ?? "false");
@@ -503,6 +572,7 @@
     const editBtn = document.getElementById("editBtn");
     const summaryBar = document.getElementById("portfolioSummary");
     const pnlToggleBtn = document.getElementById("pnlToggleBtn");
+    const calBannerEl = document.getElementById("marketCalendarBanner");
 
     function applyPnlSummaryState() {
       if (!summaryBar || !pnlToggleBtn) return;
@@ -721,6 +791,7 @@
     function getActiveTab() {
       if (document.getElementById("viewPortfolio").style.display !== "none") return "portfolio";
       if (document.getElementById("viewAlert").style.display !== "none") return "alert";
+      if (document.getElementById("viewAgenda").style.display !== "none") return "agenda";
       if (document.getElementById("viewBackup").style.display !== "none") return "backup";
       return "asset";
     }
@@ -740,11 +811,13 @@
       document.getElementById("tabAsset").classList.toggle("active", tabName === "asset");
       document.getElementById("tabPortfolio").classList.toggle("active", tabName === "portfolio");
       document.getElementById("tabAlert").classList.toggle("active", tabName === "alert");
+      document.getElementById("tabAgenda").classList.toggle("active", tabName === "agenda");
       document.getElementById("tabBackup").classList.toggle("active", tabName === "backup");
 
       document.getElementById("viewAsset").style.display = tabName === "asset" ? "block" : "none";
       document.getElementById("viewPortfolio").style.display = tabName === "portfolio" ? "block" : "none";
       document.getElementById("viewAlert").style.display = tabName === "alert" ? "block" : "none";
+      document.getElementById("viewAgenda").style.display = tabName === "agenda" ? "block" : "none";
       document.getElementById("viewBackup").style.display = tabName === "backup" ? "block" : "none";
 
       if (tabName === "asset") {
@@ -755,9 +828,156 @@
       } else if (tabName === "alert") {
         populateSelect("alertAssetSelect");
         renderAlerts();
+      } else if (tabName === "agenda") {
+        renderAgenda();
       } else if (tabName === "backup") {
         updateBackupStats();
       }
+    }
+
+    function pad2(n) {
+      return String(n).padStart(2, "0");
+    }
+
+    function formatDateKey(y, m, d) {
+      return `${y}-${pad2(m)}-${pad2(d)}`;
+    }
+
+    function addDaysToDateKey(dateKey, deltaDays) {
+      const [y, m, d] = dateKey.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d + deltaDays));
+      return formatDateKey(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    }
+
+    function getDayOfWeekFromKey(dateKey) {
+      const [y, m, d] = dateKey.split("-").map(Number);
+      return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    }
+
+    function getMarketEventForDate(dateKey) {
+      return US_MARKET_EVENTS[dateKey] || null;
+    }
+
+    function saveAgenda() {
+      agendaEvents.sort((a, b) => `${a.date || ""} ${a.time || ""}`.localeCompare(`${b.date || ""} ${b.time || ""}`));
+      localStorage.setItem("watch_agenda_v1", JSON.stringify(agendaEvents));
+      renderAgenda();
+      renderMarketCalendarBanner();
+    }
+
+    function addAgendaEvent() {
+      unlockAudio();
+      const title = document.getElementById("agendaTitleInput").value.trim();
+      const date = document.getElementById("agendaDateInput").value;
+      const time = document.getElementById("agendaTimeInput").value || "08:30";
+      const tz = document.getElementById("agendaTzInput").value || "ET";
+      const note = document.getElementById("agendaNoteInput").value.trim();
+
+      if (!title || !date) {
+        showToast("⚠️ يرجى إدخال اسم الحدث والتاريخ");
+        return;
+      }
+
+      agendaEvents.push({
+        id: Date.now(),
+        title,
+        date,
+        time,
+        tz,
+        note
+      });
+
+      document.getElementById("agendaTitleInput").value = "";
+      document.getElementById("agendaNoteInput").value = "";
+      saveAgenda();
+    }
+
+    function deleteAgendaEvent(id) {
+      agendaEvents = agendaEvents.filter(ev => ev.id !== id);
+      saveAgenda();
+    }
+
+    function renderAgenda() {
+      const container = document.getElementById("agendaList");
+      const countEl = document.getElementById("agendaCount");
+      if (!container || !countEl) return;
+
+      countEl.textContent = agendaEvents.length;
+      container.innerHTML = "";
+
+      if (!agendaEvents.length) {
+        container.innerHTML = `<div style="font-size:12px; color:var(--muted); text-align:center; padding:8px;">لا توجد أحداث مسجلة في أجندة الأسبوع</div>`;
+        return;
+      }
+
+      agendaEvents.forEach(ev => {
+        const row = document.createElement("div");
+        row.className = "sub-row";
+        row.innerHTML = `
+          <div>
+            <strong>${ev.title}</strong>
+            <div style="color:var(--muted); font-size:11px; margin-top:2px;">
+              ${ev.date} • ${ev.time} (${ev.tz === "ET" ? "ET" : "Local"})${ev.note ? " — " + ev.note : ""}
+            </div>
+          </div>
+          <button class="btn btn-sm" style="color:var(--red); border-color:var(--red);" onclick="deleteAgendaEvent(${ev.id})">حذف</button>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function renderMarketCalendarBanner() {
+      if (!calBannerEl) return;
+      const et = getEtWallTime(new Date());
+      const todayKey = formatDateKey(et.year, et.month, et.date);
+      const lines = [];
+
+      // Look ahead 7 days (covers rest of current week and upcoming week early notice)
+      for (let i = 0; i <= 7; i++) {
+        const k = addDaysToDateKey(todayKey, i);
+        const ev = getMarketEventForDate(k);
+        if (ev) {
+          const dayTag = i === 0 ? "اليوم" : (i === 1 ? "غداً" : k);
+          if (ev.type === "CLOSED") {
+            lines.push(`
+              <div class="cal-line">
+                <span><span class="cal-badge-holiday">عطلة سوق الأسهم:</span> ${ev.name}</span>
+                <span style="color:var(--muted); direction:ltr;">${dayTag} (${k})</span>
+              </div>
+            `);
+          } else if (ev.type === "EARLY_CLOSE") {
+            lines.push(`
+              <div class="cal-line">
+                <span><span class="cal-badge-early">إغلاق مبكر:</span> ${ev.name}</span>
+                <span style="color:var(--muted); direction:ltr;">${dayTag} (${k})</span>
+              </div>
+            `);
+          }
+        }
+      }
+
+      // Show upcoming custom agenda events within next 7 days
+      agendaEvents.forEach(ev => {
+        if (!ev.date) return;
+        if (ev.date >= todayKey && ev.date <= addDaysToDateKey(todayKey, 7)) {
+          const whenLabel = ev.date === todayKey ? `اليوم ${ev.time}` : `${ev.date} ${ev.time}`;
+          lines.push(`
+            <div class="cal-line">
+              <span><span class="cal-badge-event">حدث أسبوعي:</span> ${ev.title}${ev.note ? " (" + ev.note + ")" : ""}</span>
+              <span style="color:var(--muted); direction:ltr;">${whenLabel} (${ev.tz === "ET" ? "ET" : "Local"})</span>
+            </div>
+          `);
+        }
+      });
+
+      if (!lines.length) {
+        calBannerEl.classList.remove("show");
+        calBannerEl.innerHTML = "";
+        return;
+      }
+
+      calBannerEl.innerHTML = lines.join("");
+      calBannerEl.classList.add("show");
     }
 
     function updateBackupStats() {
@@ -767,7 +987,8 @@
       box.innerHTML = `
         • الأصول في القائمة: <strong>${assets.length}</strong><br>
         • المراكز المفتوحة في المحفظة: <strong>${posCount}</strong><br>
-        • التنبيهات المسجلة: <strong>${alerts.length}</strong>
+        • التنبيهات المسجلة: <strong>${alerts.length}</strong><br>
+        • أحداث أجندة الأسبوع: <strong>${agendaEvents.length}</strong>
       `;
     }
 
@@ -775,12 +996,13 @@
       unlockAudio();
       const backupPayload = {
         app: "prices-viewer",
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         data: {
           watch_assets_v1: assets,
           watch_alerts_v1: alerts,
           watch_positions_v1: positions,
+          watch_agenda_v1: agendaEvents,
           watch_theme_v1: savedTheme,
           watch_sound_v1: soundEnabled,
           watch_hide_toolbar_v1: hideSideToolbar,
@@ -833,6 +1055,7 @@
           assets = data.watch_assets_v1;
           alerts = Array.isArray(data.watch_alerts_v1) ? data.watch_alerts_v1 : [];
           positions = (data.watch_positions_v1 && typeof data.watch_positions_v1 === "object") ? data.watch_positions_v1 : {};
+          agendaEvents = Array.isArray(data.watch_agenda_v1) ? data.watch_agenda_v1 : [];
           savedTheme = data.watch_theme_v1 || savedTheme;
           soundEnabled = typeof data.watch_sound_v1 === "boolean" ? data.watch_sound_v1 : soundEnabled;
           hideSideToolbar = typeof data.watch_hide_toolbar_v1 === "boolean" ? data.watch_hide_toolbar_v1 : hideSideToolbar;
@@ -843,6 +1066,7 @@
           localStorage.setItem("watch_assets_v1", JSON.stringify(assets));
           localStorage.setItem("watch_alerts_v1", JSON.stringify(alerts));
           localStorage.setItem("watch_positions_v1", JSON.stringify(positions));
+          localStorage.setItem("watch_agenda_v1", JSON.stringify(agendaEvents));
           localStorage.setItem("watch_theme_v1", savedTheme);
           localStorage.setItem("watch_sound_v1", JSON.stringify(soundEnabled));
           localStorage.setItem("watch_hide_toolbar_v1", JSON.stringify(hideSideToolbar));
@@ -858,6 +1082,8 @@
           renderList();
           renderPositions();
           renderAlerts();
+          renderAgenda();
+          renderMarketCalendarBanner();
           updateTotalPnl();
           updateBackupStats();
           connectEquity();
@@ -1314,52 +1540,39 @@
     function getNextSessionInfo(nowMs) {
       const et = getEtWallTime(new Date(nowMs));
       const secOfDay = et.hour * 3600 + et.minute * 60 + et.second;
-      const d = et.day;
+      const todayKey = formatDateKey(et.year, et.month, et.date);
 
-      let nextCode = "P";
-      let deltaDays = 0;
-      let targetSecOfDay = 4 * 3600;
+      // Scan up to 10 days ahead to find the next valid session transition respecting holidays & early closes
+      for (let offset = 0; offset <= 10; offset++) {
+        const dk = addDaysToDateKey(todayKey, offset);
+        const dow = getDayOfWeekFromKey(dk);
+        const ev = getMarketEventForDate(dk);
+        const isClosedWeekday = dow >= 1 && dow <= 5 && ev && ev.type === "CLOSED";
+        const isEarlyClose = dow >= 1 && dow <= 5 && ev && ev.type === "EARLY_CLOSE";
+        const closeSec = isEarlyClose && ev.earlyCloseSec ? ev.earlyCloseSec : 16 * 3600;
 
-      if (d >= 1 && d <= 5) {
-        if (secOfDay < 4 * 3600) {
-          nextCode = "P";
-          deltaDays = 0;
-          targetSecOfDay = 4 * 3600;
-        } else if (secOfDay < 9 * 3600 + 30 * 60) {
-          nextCode = "R";
-          deltaDays = 0;
-          targetSecOfDay = 9 * 3600 + 30 * 60;
-        } else if (secOfDay < 16 * 3600) {
-          nextCode = "A";
-          deltaDays = 0;
-          targetSecOfDay = 16 * 3600;
-        } else if (secOfDay < 20 * 3600) {
-          nextCode = d === 5 ? "C" : "O";
-          deltaDays = 0;
-          targetSecOfDay = 20 * 3600;
-        } else {
-          nextCode = "P";
-          deltaDays = d === 5 ? 2 : 1;
-          targetSecOfDay = 4 * 3600;
-        }
-      } else if (d === 6) {
-        nextCode = "P";
-        deltaDays = 1;
-        targetSecOfDay = 4 * 3600;
-      } else {
-        if (secOfDay < 20 * 3600) {
-          nextCode = "O";
-          deltaDays = 0;
-          targetSecOfDay = 20 * 3600;
-        } else {
-          nextCode = "P";
-          deltaDays = 1;
-          targetSecOfDay = 4 * 3600;
+        if (dow >= 1 && dow <= 5 && !isClosedWeekday) {
+          const candidates = [
+            { code: "P", sec: 4 * 3600 },
+            { code: "R", sec: 9 * 3600 + 30 * 60 },
+            { code: "A", sec: closeSec },
+            { code: "O", sec: 20 * 3600 }
+          ];
+          for (const c of candidates) {
+            const totalOffsetSec = offset * 86400 + (c.sec - secOfDay);
+            if (totalOffsetSec > 0) {
+              return { nextCode: c.code, diffSec: totalOffsetSec };
+            }
+          }
+        } else if (dow === 0) {
+          const totalOffsetSec = offset * 86400 + (20 * 3600 - secOfDay);
+          if (totalOffsetSec > 0) {
+            return { nextCode: "O", diffSec: totalOffsetSec };
+          }
         }
       }
 
-      const diffSec = Math.max(0, deltaDays * 86400 + (targetSecOfDay - secOfDay));
-      return { nextCode, diffSec };
+      return { nextCode: "P", diffSec: 86400 };
     }
 
     function formatCountdown(totalSec) {
@@ -1692,6 +1905,8 @@
     renderList();
     renderPositions();
     renderAlerts();
+    renderAgenda();
+    renderMarketCalendarBanner();
     updateTotalPnl();
     updateNextSessionTimer();
     setInterval(updateNextSessionTimer, 1000);
