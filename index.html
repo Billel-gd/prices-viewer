@@ -84,7 +84,9 @@
       padding: 4px 9px; border-radius: 999px;
       font-size: 11px; font-weight: 700; direction: ltr;
       font-variant-numeric: tabular-nums;
+      cursor: pointer; transition: transform 0.12s ease, border-color 0.15s ease;
     }
+    .session-timer:active { transform: scale(0.98); }
     .session-timer .cur-lbl { font-weight: 800; }
     .session-timer .arrow-sep { color: var(--muted); font-weight: 600; }
     .session-timer .next-lbl { color: var(--muted); font-weight: 600; }
@@ -258,7 +260,7 @@
       background: var(--tag-bg); color: var(--accent); font-weight: 600;
       display: inline-flex; align-items: center; gap: 4px; line-height: 1.1;
     }
-    .tag svg, .session-timer svg { width: 12px; height: 12px; flex-shrink: 0; }
+    .tag svg, .session-timer svg, .smap-head-title svg { width: 12px; height: 12px; flex-shrink: 0; }
     .tag.sess-pre { color: #f59e0b; }
     .tag.sess-open { color: #10b981; }
     .tag.sess-post { color: #a855f7; }
@@ -285,6 +287,96 @@
 
     .status-bar {
       text-align: center; font-size: 11px; color: var(--muted); margin-top: 12px;
+    }
+
+    /* Session Map Modal */
+    .smap-modal {
+      position: fixed; inset: 0; z-index: 85;
+      background: rgba(0, 0, 0, 0.72);
+      display: none; align-items: flex-end; justify-content: center;
+    }
+    .smap-modal.show { display: flex; }
+    .smap-sheet {
+      width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto;
+      background: var(--card); border-top: 1px solid var(--border);
+      border-top-left-radius: 16px; border-top-right-radius: 16px;
+      padding: 14px 14px 20px; direction: ltr;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .smap-top {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .smap-head-title {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 16px; font-weight: 800;
+    }
+    .smap-head-title svg { width: 16px; height: 16px; }
+    .smap-sub-range { font-size: 12px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .smap-next-line { font-size: 12px; color: var(--text); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .smap-next-line strong { color: var(--accent); }
+
+    .smap-axis-wrap {
+      position: relative; margin-top: 14px; padding-top: 22px; padding-bottom: 6px;
+    }
+    .smap-ticks {
+      display: flex; justify-content: space-between;
+      font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+      margin-bottom: 6px; padding-left: 38px;
+    }
+    .smap-grid-area {
+      position: relative; padding-left: 38px;
+    }
+    .smap-day-row {
+      display: flex; align-items: center; gap: 8px;
+      height: 28px; padding: 2px 4px; border-radius: 6px;
+      margin-left: -38px;
+    }
+    .smap-day-row.is-today {
+      background: rgba(240, 185, 11, 0.09);
+    }
+    .smap-day-lbl {
+      width: 30px; font-size: 11px; font-weight: 700; color: var(--muted);
+      text-align: left; flex-shrink: 0;
+    }
+    .smap-day-row.is-today .smap-day-lbl { color: var(--accent); }
+    .smap-track {
+      position: relative; flex: 1; height: 7px; border-radius: 999px;
+      background: rgba(156, 163, 175, 0.22); overflow: visible;
+    }
+    .smap-seg {
+      position: absolute; top: 0; bottom: 0; border-radius: 999px;
+    }
+    .smap-seg.c-night { background: #3b82f6; }
+    .smap-seg.c-pre { background: #f59e0b; }
+    .smap-seg.c-open { background: #10b981; }
+    .smap-seg.c-post { background: #a855f7; }
+
+    .smap-now-line {
+      position: absolute; top: 18px; bottom: 4px; width: 1.5px;
+      border-left: 1.5px dashed var(--text); opacity: 0.85;
+      pointer-events: none; z-index: 5;
+    }
+    .smap-now-badge {
+      position: absolute; top: -18px; transform: translateX(-50%);
+      background: var(--text); color: var(--bg);
+      font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 4px;
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+
+    .smap-legend {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px;
+      margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+    }
+    .smap-leg-item { display: flex; flex-direction: column; gap: 2px; }
+    .smap-leg-head { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; }
+    .smap-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .smap-leg-liq { font-size: 10.5px; color: var(--muted); padding-left: 13px; }
+
+    .smap-note {
+      margin-top: 10px; padding: 8px 10px; border-radius: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      font-size: 11px; color: var(--muted); line-height: 1.5; direction: rtl;
     }
 
     .tv-modal {
@@ -340,7 +432,7 @@
         </button>
       </div>
       <div class="timer-slot">
-        <div class="session-timer sess-closed" id="nextSessionTimer" title="الجلسة الحالية والوقت المتبقي للجلسة التالية (ET)">
+        <div class="session-timer sess-closed" id="nextSessionTimer" onclick="openSessionMapModal()" title="انقر لعرض الخريطة الزمنية الأسبوعية للجلسات">
           <span id="curSessIcon"></span>
           <span class="cur-lbl" id="curSessLabel">Mkt Closed</span>
           <span class="arrow-sep">→</span>
@@ -483,6 +575,47 @@
   <div class="list" id="assetList"></div>
   <div class="status-bar" id="statusText">جاري الاتصال ببث بايننس...</div>
 
+  <!-- Session Schedule Map Modal -->
+  <div class="smap-modal" id="sessionMapModal" onclick="if(event.target.id==='sessionMapModal') closeSessionMapModal()">
+    <div class="smap-sheet">
+      <div class="smap-top">
+        <div>
+          <div class="smap-head-title" id="smapTitle"></div>
+          <div class="smap-sub-range" id="smapLocalRange"></div>
+          <div class="smap-next-line" id="smapNextLine"></div>
+        </div>
+        <button class="btn btn-sm" onclick="closeSessionMapModal()">✕</button>
+      </div>
+
+      <div class="smap-axis-wrap" id="smapChartContainer"></div>
+
+      <div class="smap-legend">
+        <div class="smap-leg-item">
+          <div class="smap-leg-head"><span class="smap-dot" style="background:#f59e0b;"></span><span>Pre-Mkt</span></div>
+          <span class="smap-leg-liq">Medium Liquidity</span>
+        </div>
+        <div class="smap-leg-item">
+          <div class="smap-leg-head"><span class="smap-dot" style="background:#10b981;"></span><span>Mkt Open</span></div>
+          <span class="smap-leg-liq">High Liquidity</span>
+        </div>
+        <div class="smap-leg-item">
+          <div class="smap-leg-head"><span class="smap-dot" style="background:#a855f7;"></span><span>Post-Mkt</span></div>
+          <span class="smap-leg-liq">Medium Liquidity</span>
+        </div>
+        <div class="smap-leg-item">
+          <div class="smap-leg-head"><span class="smap-dot" style="background:#3b82f6;"></span><span>Overnight</span></div>
+          <span class="smap-leg-liq">Low Liquidity</span>
+        </div>
+        <div class="smap-leg-item">
+          <div class="smap-leg-head"><span class="smap-dot" style="background:#9ca3af;"></span><span>Mkt Closed</span></div>
+          <span class="smap-leg-liq">-</span>
+        </div>
+      </div>
+
+      <div class="smap-note" id="smapCalendarNote"></div>
+    </div>
+  </div>
+
   <div class="tv-modal" id="tvModal">
     <div class="tv-shell">
       <div class="tv-topbar">
@@ -573,6 +706,7 @@
 
     let currentTvSymbol = "BINANCE:BTCUSDT";
     let tvModalOpen = false;
+    let sessionMapOpen = false;
     let menuOpen = false;
 
     let dragState = {
@@ -791,6 +925,18 @@
       document.getElementById("tvFullContainer").innerHTML = "";
     }
 
+    function openSessionMapModal() {
+      unlockAudio();
+      sessionMapOpen = true;
+      renderSessionMapModal();
+      document.getElementById("sessionMapModal").classList.add("show");
+    }
+
+    function closeSessionMapModal() {
+      sessionMapOpen = false;
+      document.getElementById("sessionMapModal").classList.remove("show");
+    }
+
     function applyTheme(theme) {
       document.documentElement.setAttribute("data-theme", theme);
       localStorage.setItem("watch_theme_v1", theme);
@@ -918,7 +1064,7 @@
       return US_MARKET_EVENTS[dateKey] || null;
     }
 
-    function convertEtSecToLocalTimeStr(dateKey, secOfDay) {
+    function etDateTimeToUtcMs(dateKey, secOfDay) {
       const [y, m, d] = dateKey.split("-").map(Number);
       const hh = Math.floor(secOfDay / 3600);
       const mm = Math.floor((secOfDay % 3600) / 60);
@@ -933,9 +1079,52 @@
         const diffSec = (targetDateNum - wallDateNum) / 1000 + (secOfDay - wallSec);
         utcGuess += diffSec * 1000;
       }
+      return utcGuess;
+    }
 
-      const localDt = new Date(utcGuess);
-      return `${pad2(localDt.getHours())}:${pad2(localDt.getMinutes())}`;
+    function formatUtcMsToLocalHM(utcMs) {
+      const dt = new Date(utcMs);
+      return `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+    }
+
+    function convertEtSecToLocalTimeStr(dateKey, secOfDay) {
+      return formatUtcMsToLocalHM(etDateTimeToUtcMs(dateKey, secOfDay));
+    }
+
+    function getLocalTimezoneLabel() {
+      const offsetMin = -new Date().getTimezoneOffset();
+      const sign = offsetMin >= 0 ? "+" : "-";
+      const absMin = Math.abs(offsetMin);
+      const h = Math.floor(absMin / 60);
+      const m = absMin % 60;
+      return m === 0 ? `UTC${sign}${h}` : `UTC${sign}${h}:${pad2(m)}`;
+    }
+
+    function getSessionLocalRangeText(dateKey, code) {
+      const dow = getDayOfWeekFromKey(dateKey);
+      const ev = getMarketEventForDate(dateKey);
+      const isClosedWeekday = dow >= 1 && dow <= 5 && ev && ev.type === "CLOSED";
+      const isEarlyClose = dow >= 1 && dow <= 5 && ev && ev.type === "EARLY_CLOSE";
+      const closeSec = isEarlyClose && ev.earlyCloseSec ? ev.earlyCloseSec : 16 * 3600;
+      const postEndSec = isEarlyClose && ev.postCloseSec ? ev.postCloseSec : 20 * 3600;
+      const tzLbl = getLocalTimezoneLabel();
+
+      if (code === "P") {
+        return `${convertEtSecToLocalTimeStr(dateKey, 4 * 3600)} - ${convertEtSecToLocalTimeStr(dateKey, 9 * 3600 + 30 * 60)} ${tzLbl}`;
+      }
+      if (code === "R") {
+        return `${convertEtSecToLocalTimeStr(dateKey, 9 * 3600 + 30 * 60)} - ${convertEtSecToLocalTimeStr(dateKey, closeSec)} ${tzLbl}`;
+      }
+      if (code === "A") {
+        return `${convertEtSecToLocalTimeStr(dateKey, closeSec)} - ${convertEtSecToLocalTimeStr(dateKey, postEndSec)} ${tzLbl}`;
+      }
+      if (code === "O") {
+        if (dow === 0) {
+          return `${convertEtSecToLocalTimeStr(dateKey, 20 * 3600)} - ${convertEtSecToLocalTimeStr(addDaysToDateKey(dateKey, 1), 4 * 3600)} ${tzLbl}`;
+        }
+        return `${convertEtSecToLocalTimeStr(dateKey, 20 * 3600)} - ${convertEtSecToLocalTimeStr(addDaysToDateKey(dateKey, 1), 4 * 3600)} ${tzLbl}`;
+      }
+      return `${tzLbl}`;
     }
 
     function saveAgenda() {
@@ -1714,6 +1903,111 @@
       curLblEl.textContent = curMeta.label;
       nextLblEl.textContent = nextMeta.label;
       cdEl.textContent = formatCountdown(diffSec);
+
+      if (sessionMapOpen) {
+        renderSessionMapModal();
+      }
+    }
+
+    // Build local-day (0..24h in user's local timezone) colored session segments for a given local date
+    function getLocalDaySegments(localYear, localMonthIndex, localDay) {
+      const dayStartMs = new Date(localYear, localMonthIndex, localDay, 0, 0, 0, 0).getTime();
+      const dayEndMs = dayStartMs + 86400 * 1000;
+      const daySpanSec = 86400;
+
+      // Sample every 5 minutes (300s) across the local day and merge contiguous session codes
+      const stepSec = 300;
+      const raw = [];
+      for (let s = 0; s < daySpanSec; s += stepSec) {
+        const sampleMs = dayStartMs + (s + stepSec / 2) * 1000;
+        const code = getCurrentEtSessionCode(sampleMs);
+        const clsMap = { "O": "c-night", "P": "c-pre", "R": "c-open", "A": "c-post", "C": "" };
+        const cls = clsMap[code] || "";
+        if (raw.length && raw[raw.length - 1].cls === cls) {
+          raw[raw.length - 1].endSec = s + stepSec;
+        } else {
+          raw.push({ cls, startSec: s, endSec: s + stepSec });
+        }
+      }
+      return raw.filter(seg => seg.cls !== "");
+    }
+
+    function renderSessionMapModal() {
+      const now = new Date();
+      const { currentCode, nextCode, diffSec } = getNextSessionInfo(now.getTime());
+      const curMeta = getSessionMeta(currentCode);
+      const nextMeta = getSessionMeta(nextCode);
+      const et = getEtWallTime(now);
+      const todayKey = formatDateKey(et.year, et.month, et.date);
+
+      const titleEl = document.getElementById("smapTitle");
+      const rangeEl = document.getElementById("smapLocalRange");
+      const nextLineEl = document.getElementById("smapNextLine");
+      const chartEl = document.getElementById("smapChartContainer");
+      const noteEl = document.getElementById("smapCalendarNote");
+      if (!titleEl || !rangeEl || !nextLineEl || !chartEl || !noteEl) return;
+
+      titleEl.innerHTML = `<span style="color:var(--${currentCode === "R" ? "green" : "accent"})">${curMeta.svg}</span><span>${curMeta.label}</span>`;
+      rangeEl.textContent = getSessionLocalRangeText(todayKey, currentCode);
+      nextLineEl.innerHTML = `Next: <strong>${nextMeta.label}</strong> in <strong>${formatCountdown(diffSec)}</strong>`;
+
+      // Anchor week on Monday of current local week (Mon..Sun)
+      const localDow = now.getDay(); // 0=Sun..6=Sat
+      const diffToMon = localDow === 0 ? -6 : 1 - localDow;
+      const mondayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMon);
+      const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+      const nowSecInLocalDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const nowPct = Math.min(100, Math.max(0, (nowSecInLocalDay / 86400) * 100));
+      const localTimeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+
+      // Pick key tick labels across the 24h local day
+      const tickHours = [0, 6, 12, 18, 23];
+      const ticksHtml = tickHours.map(h => `<span>${pad2(h)}:00</span>`).join("");
+
+      let rowsHtml = "";
+      for (let i = 0; i < 7; i++) {
+        const dObj = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), mondayDate.getDate() + i);
+        const isToday =
+          dObj.getFullYear() === now.getFullYear() &&
+          dObj.getMonth() === now.getMonth() &&
+          dObj.getDate() === now.getDate();
+
+        const segs = getLocalDaySegments(dObj.getFullYear(), dObj.getMonth(), dObj.getDate());
+        const segsHtml = segs.map(seg => {
+          const leftPct = (seg.startSec / 86400) * 100;
+          const widthPct = ((seg.endSec - seg.startSec) / 86400) * 100;
+          return `<div class="smap-seg ${seg.cls}" style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;"></div>`;
+        }).join("");
+
+        rowsHtml += `
+          <div class="smap-day-row ${isToday ? "is-today" : ""}">
+            <span class="smap-day-lbl">${dayNames[i]}</span>
+            <div class="smap-track">${segsHtml}</div>
+          </div>
+        `;
+      }
+
+      chartEl.innerHTML = `
+        <div class="smap-ticks">${ticksHtml}</div>
+        <div class="smap-grid-area">
+          <div class="smap-now-line" style="left: calc(38px + (100% - 38px) * ${(nowPct / 100).toFixed(4)});">
+            <span class="smap-now-badge">${localTimeStr}</span>
+          </div>
+          ${rowsHtml}
+        </div>
+      `;
+
+      const evToday = getMarketEventForDate(todayKey);
+      if (evToday && evToday.type === "EARLY_CLOSE") {
+        const closeLoc = convertEtSecToLocalTimeStr(todayKey, evToday.earlyCloseSec || 13 * 3600);
+        const postEndLoc = evToday.postCloseSec ? convertEtSecToLocalTimeStr(todayKey, evToday.postCloseSec) : null;
+        noteEl.innerHTML = `تنبيه اليوم (${todayKey}): <strong>${evToday.name}</strong> — إغلاق الجلسة الرئيسية عند <strong>${closeLoc}</strong> بتوقيتك المحلي${postEndLoc ? `، ونهاية Post-Mkt عند <strong>${postEndLoc}</strong>` : ""}.`;
+      } else if (evToday && evToday.type === "CLOSED") {
+        noteEl.innerHTML = `تنبيه اليوم (${todayKey}): عطلة سوق الأسهم الأمريكية (<strong>${evToday.name}</strong>).`;
+      } else {
+        noteEl.innerHTML = `جميع الأوقات معروضة بتوقيتك المحلي (<strong>${getLocalTimezoneLabel()}</strong>) مع احتساب العطل والإغلاق المبكر تلقائياً.`;
+      }
     }
 
     function formatNum(num) {
