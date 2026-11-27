@@ -124,7 +124,7 @@
       font-size: 11.5px; line-height: 1.55; display: none;
     }
     .cal-banner.show { display: block; }
-    .cal-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 0; }
+    .cal-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 0; flex-wrap: wrap; }
     .cal-badge-holiday { color: var(--red); font-weight: 700; }
     .cal-badge-early { color: var(--accent); font-weight: 700; }
     .cal-badge-event { color: #38bdf8; font-weight: 700; }
@@ -523,8 +523,8 @@
       "2026-07-03": { type: "CLOSED", name: "Independence Day (Observed)" },
       "2026-09-07": { type: "CLOSED", name: "Labor Day" },
       "2026-11-26": { type: "CLOSED", name: "Thanksgiving Day" },
-      "2026-11-27": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close (13:00 ET)" },
-      "2026-12-24": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Christmas Eve Early Close (13:00 ET)" },
+      "2026-11-27": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close" },
+      "2026-12-24": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Christmas Eve Early Close" },
       "2026-12-25": { type: "CLOSED", name: "Christmas Day" },
 
       "2027-01-01": { type: "CLOSED", name: "New Year's Day" },
@@ -536,7 +536,7 @@
       "2027-07-05": { type: "CLOSED", name: "Independence Day (Observed)" },
       "2027-09-06": { type: "CLOSED", name: "Labor Day" },
       "2027-11-25": { type: "CLOSED", name: "Thanksgiving Day" },
-      "2027-11-26": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close (13:00 ET)" },
+      "2027-11-26": { type: "EARLY_CLOSE", earlyCloseSec: 13 * 3600, name: "Early Close" },
       "2027-12-24": { type: "CLOSED", name: "Christmas Day (Observed)" }
     };
 
@@ -918,6 +918,27 @@
       return US_MARKET_EVENTS[dateKey] || null;
     }
 
+    function convertEtSecToLocalTimeStr(dateKey, secOfDay) {
+      const [y, m, d] = dateKey.split("-").map(Number);
+      const hh = Math.floor(secOfDay / 3600);
+      const mm = Math.floor((secOfDay % 3600) / 60);
+      const ss = secOfDay % 60;
+
+      // Find exact UTC epoch for (y-m-d hh:mm:ss) in America/New_York
+      let utcGuess = Date.UTC(y, m - 1, d, hh, mm, ss);
+      for (let i = 0; i < 3; i++) {
+        const wall = getEtWallTime(new Date(utcGuess));
+        const wallSec = wall.hour * 3600 + wall.minute * 60 + wall.second;
+        const wallDateNum = Date.UTC(wall.year, wall.month - 1, wall.date);
+        const targetDateNum = Date.UTC(y, m - 1, d);
+        const diffSec = (targetDateNum - wallDateNum) / 1000 + (secOfDay - wallSec);
+        utcGuess += diffSec * 1000;
+      }
+
+      const localDt = new Date(utcGuess);
+      return `${pad2(localDt.getHours())}:${pad2(localDt.getMinutes())}`;
+    }
+
     function saveAgenda() {
       agendaEvents.sort((a, b) => `${a.date || ""} ${a.time || ""}`.localeCompare(`${b.date || ""} ${b.time || ""}`));
       localStorage.setItem("watch_agenda_v1", JSON.stringify(agendaEvents));
@@ -998,9 +1019,10 @@
               </div>
             `);
           } else if (ev.type === "EARLY_CLOSE") {
+            const localCloseStr = convertEtSecToLocalTimeStr(k, ev.earlyCloseSec || 13 * 3600);
             lines.push(`
               <div class="cal-line">
-                <span><span class="cal-badge-early">إغلاق مبكر:</span> ${ev.name}</span>
+                <span><span class="cal-badge-early">إغلاق مبكر:</span> ${ev.name} (${localCloseStr} المحلي)</span>
                 <span style="color:var(--muted); direction:ltr;">${dayTag} (${k})</span>
               </div>
             `);
@@ -1692,7 +1714,7 @@
 
     function renderList(activeDragIdx = -1) {
       listEl.innerHTML = "";
-      const fallbackStockSession = getCurrentEtSessionCode(Date.now());
+      const liveStockSession = getCurrentEtSessionCode(Date.now());
 
       assets.forEach((asset, idx) => {
         const key = `${asset.type}:${asset.sym}`;
@@ -1709,8 +1731,7 @@
         let extraTag = "";
         let subText = "";
         if (asset.type === "STOCK") {
-          const effectiveMp = d.mp || fallbackStockSession;
-          extraTag = renderSessionTagHtml(key, effectiveMp);
+          extraTag = renderSessionTagHtml(key, liveStockSession);
           subText = d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks";
         } else if (asset.type === "PERP") {
           extraTag = `<span class="tag perp-tag">24H Perp</span>`;
@@ -1793,8 +1814,7 @@
       if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
 
       if (tagEl) {
-        const effectiveMp = d.mp || getCurrentEtSessionCode(Date.now());
-        const m = getSessionMeta(effectiveMp);
+        const m = getSessionMeta(getCurrentEtSessionCode(Date.now()));
         tagEl.className = `tag ${m.cls}`;
         tagEl.innerHTML = `${m.svg}<span>${m.label}</span>`;
       }
@@ -1861,7 +1881,7 @@
             const ask = marketData[key]?.ask;
             const p = item.p || ((bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : prevPrice);
             const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
-            marketData[key] = { ...marketData[key], price: p, pc, mp: item.mp || marketData[key]?.mp, chg };
+            marketData[key] = { ...marketData[key], price: p, pc, chg };
             updateRowUI(key, prevPrice);
           });
           scheduleSaveMarketCache();
@@ -1877,7 +1897,7 @@
           const p = data.p || mid || prevPrice;
           const pc = data.pc || data.lrc || marketData[key]?.pc;
           const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
-          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, mp: data.mp || marketData[key]?.mp, chg };
+          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, chg };
           updateRowUI(key, prevPrice);
           scheduleSaveMarketCache();
         }
@@ -1982,6 +2002,18 @@
       };
     }
 
+    function syncStockSessionTags() {
+      const m = getSessionMeta(getCurrentEtSessionCode(Date.now()));
+      assets.forEach(a => {
+        if (a.type !== "STOCK") return;
+        const tagEl = document.getElementById(`tag-STOCK:${a.sym}`);
+        if (tagEl) {
+          tagEl.className = `tag ${m.cls}`;
+          tagEl.innerHTML = `${m.svg}<span>${m.label}</span>`;
+        }
+      });
+    }
+
     applyTheme(savedTheme);
     applyPnlSummaryState();
     updateSoundButton();
@@ -1994,7 +2026,10 @@
     renderMarketCalendarBanner();
     updateTotalPnl();
     updateNextSessionTimer();
-    setInterval(updateNextSessionTimer, 1000);
+    setInterval(() => {
+      updateNextSessionTimer();
+      syncStockSessionTags();
+    }, 1000);
     connectEquity();
     connectCrypto();
     connectPerp();
