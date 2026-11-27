@@ -79,12 +79,14 @@
     }
 
     .session-timer {
-      display: inline-flex; align-items: center; gap: 6px;
+      display: inline-flex; align-items: center; gap: 5px;
       background: var(--card); border: 1px solid var(--border);
       padding: 4px 9px; border-radius: 999px;
       font-size: 11px; font-weight: 700; direction: ltr;
       font-variant-numeric: tabular-nums;
     }
+    .session-timer .cur-lbl { font-weight: 800; }
+    .session-timer .arrow-sep { color: var(--muted); font-weight: 600; }
     .session-timer .next-lbl { color: var(--muted); font-weight: 600; }
     .session-timer .cd-val { color: var(--accent); font-weight: 700; }
     .session-timer.sess-pre { border-color: rgba(245, 158, 11, 0.45); color: #f59e0b; }
@@ -338,8 +340,10 @@
         </button>
       </div>
       <div class="timer-slot">
-        <div class="session-timer sess-closed" id="nextSessionTimer" title="الوقت المتبقي حتى الجلسة التالية (ET)">
-          <span id="nextSessIcon"></span>
+        <div class="session-timer sess-closed" id="nextSessionTimer" title="الجلسة الحالية والوقت المتبقي للجلسة التالية (ET)">
+          <span id="curSessIcon"></span>
+          <span class="cur-lbl" id="curSessLabel">Mkt Closed</span>
+          <span class="arrow-sep">→</span>
           <span class="next-lbl" id="nextSessLabel">Pre-Mkt</span>
           <span class="cd-val" id="nextSessCountdown">--:--:--</span>
         </div>
@@ -1584,10 +1588,37 @@
       };
     }
 
+    function getCurrentEtSessionCode(nowMs = Date.now()) {
+      const et = getEtWallTime(new Date(nowMs));
+      const secOfDay = et.hour * 3600 + et.minute * 60 + et.second;
+      const todayKey = formatDateKey(et.year, et.month, et.date);
+      const dow = et.day;
+      const ev = getMarketEventForDate(todayKey);
+
+      if (dow === 6) return "C";
+
+      if (dow === 0) {
+        return secOfDay >= 20 * 3600 ? "O" : "C";
+      }
+
+      if (ev && ev.type === "CLOSED") {
+        return secOfDay >= 20 * 3600 ? "O" : "C";
+      }
+
+      const closeSec = (ev && ev.type === "EARLY_CLOSE" && ev.earlyCloseSec) ? ev.earlyCloseSec : 16 * 3600;
+
+      if (secOfDay < 4 * 3600) return "O";
+      if (secOfDay < 9 * 3600 + 30 * 60) return "P";
+      if (secOfDay < closeSec) return "R";
+      if (secOfDay < 20 * 3600) return "A";
+      return dow === 5 ? "C" : "O";
+    }
+
     function getNextSessionInfo(nowMs) {
       const et = getEtWallTime(new Date(nowMs));
       const secOfDay = et.hour * 3600 + et.minute * 60 + et.second;
       const todayKey = formatDateKey(et.year, et.month, et.date);
+      const currentCode = getCurrentEtSessionCode(nowMs);
 
       for (let offset = 0; offset <= 10; offset++) {
         const dk = addDaysToDateKey(todayKey, offset);
@@ -1607,18 +1638,18 @@
           for (const c of candidates) {
             const totalOffsetSec = offset * 86400 + (c.sec - secOfDay);
             if (totalOffsetSec > 0) {
-              return { nextCode: c.code, diffSec: totalOffsetSec };
+              return { currentCode, nextCode: c.code, diffSec: totalOffsetSec };
             }
           }
         } else if (dow === 0) {
           const totalOffsetSec = offset * 86400 + (20 * 3600 - secOfDay);
           if (totalOffsetSec > 0) {
-            return { nextCode: "O", diffSec: totalOffsetSec };
+            return { currentCode, nextCode: "O", diffSec: totalOffsetSec };
           }
         }
       }
 
-      return { nextCode: "P", diffSec: 86400 };
+      return { currentCode, nextCode: "P", diffSec: 86400 };
     }
 
     function formatCountdown(totalSec) {
@@ -1635,16 +1666,20 @@
 
     function updateNextSessionTimer() {
       const box = document.getElementById("nextSessionTimer");
-      const iconEl = document.getElementById("nextSessIcon");
-      const lblEl = document.getElementById("nextSessLabel");
+      const curIconEl = document.getElementById("curSessIcon");
+      const curLblEl = document.getElementById("curSessLabel");
+      const nextLblEl = document.getElementById("nextSessLabel");
       const cdEl = document.getElementById("nextSessCountdown");
-      if (!box || !iconEl || !lblEl || !cdEl) return;
+      if (!box || !curIconEl || !curLblEl || !nextLblEl || !cdEl) return;
 
-      const { nextCode, diffSec } = getNextSessionInfo(Date.now());
-      const m = getSessionMeta(nextCode);
-      box.className = `session-timer ${m.cls}`;
-      iconEl.innerHTML = m.svg;
-      lblEl.textContent = m.label;
+      const { currentCode, nextCode, diffSec } = getNextSessionInfo(Date.now());
+      const curMeta = getSessionMeta(currentCode);
+      const nextMeta = getSessionMeta(nextCode);
+
+      box.className = `session-timer ${curMeta.cls}`;
+      curIconEl.innerHTML = curMeta.svg;
+      curLblEl.textContent = curMeta.label;
+      nextLblEl.textContent = nextMeta.label;
       cdEl.textContent = formatCountdown(diffSec);
     }
 
@@ -1657,6 +1692,8 @@
 
     function renderList(activeDragIdx = -1) {
       listEl.innerHTML = "";
+      const fallbackStockSession = getCurrentEtSessionCode(Date.now());
+
       assets.forEach((asset, idx) => {
         const key = `${asset.type}:${asset.sym}`;
         const d = marketData[key] || {};
@@ -1672,7 +1709,8 @@
         let extraTag = "";
         let subText = "";
         if (asset.type === "STOCK") {
-          extraTag = renderSessionTagHtml(key, d.mp);
+          const effectiveMp = d.mp || fallbackStockSession;
+          extraTag = renderSessionTagHtml(key, effectiveMp);
           subText = d.bid && d.ask ? `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}` : "Binance Stocks";
         } else if (asset.type === "PERP") {
           extraTag = `<span class="tag perp-tag">24H Perp</span>`;
@@ -1755,7 +1793,8 @@
       if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
 
       if (tagEl) {
-        const m = getSessionMeta(d.mp);
+        const effectiveMp = d.mp || getCurrentEtSessionCode(Date.now());
+        const m = getSessionMeta(effectiveMp);
         tagEl.className = `tag ${m.cls}`;
         tagEl.innerHTML = `${m.svg}<span>${m.label}</span>`;
       }
