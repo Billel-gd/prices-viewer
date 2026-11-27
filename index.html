@@ -274,7 +274,8 @@
 
     .price-col { text-align: right; }
     .price { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
-    .prev { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .prev { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .vol-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; font-variant-numeric: tabular-nums; }
 
     .chg-col { display: flex; justify-content: flex-end; }
     .badge {
@@ -568,7 +569,7 @@
 
   <div class="table-head">
     <span>Name / Session / P&L</span>
-    <span>Last Price</span>
+    <span>Last Price / Vol</span>
     <span>Change(%)</span>
   </div>
 
@@ -1101,10 +1102,8 @@
     }
 
     function getSessionLocalRangeText(dateKey, code) {
-      const dow = getDayOfWeekFromKey(dateKey);
+      const isEarlyClose = getDayOfWeekFromKey(dateKey) >= 1 && getDayOfWeekFromKey(dateKey) <= 5 && getMarketEventForDate(dateKey)?.type === "EARLY_CLOSE";
       const ev = getMarketEventForDate(dateKey);
-      const isClosedWeekday = dow >= 1 && dow <= 5 && ev && ev.type === "CLOSED";
-      const isEarlyClose = dow >= 1 && dow <= 5 && ev && ev.type === "EARLY_CLOSE";
       const closeSec = isEarlyClose && ev.earlyCloseSec ? ev.earlyCloseSec : 16 * 3600;
       const postEndSec = isEarlyClose && ev.postCloseSec ? ev.postCloseSec : 20 * 3600;
       const tzLbl = getLocalTimezoneLabel();
@@ -1119,9 +1118,6 @@
         return `${convertEtSecToLocalTimeStr(dateKey, closeSec)} - ${convertEtSecToLocalTimeStr(dateKey, postEndSec)} ${tzLbl}`;
       }
       if (code === "O") {
-        if (dow === 0) {
-          return `${convertEtSecToLocalTimeStr(dateKey, 20 * 3600)} - ${convertEtSecToLocalTimeStr(addDaysToDateKey(dateKey, 1), 4 * 3600)} ${tzLbl}`;
-        }
         return `${convertEtSecToLocalTimeStr(dateKey, 20 * 3600)} - ${convertEtSecToLocalTimeStr(addDaysToDateKey(dateKey, 1), 4 * 3600)} ${tzLbl}`;
       }
       return `${tzLbl}`;
@@ -1909,13 +1905,9 @@
       }
     }
 
-    // Build local-day (0..24h in user's local timezone) colored session segments for a given local date
     function getLocalDaySegments(localYear, localMonthIndex, localDay) {
       const dayStartMs = new Date(localYear, localMonthIndex, localDay, 0, 0, 0, 0).getTime();
-      const dayEndMs = dayStartMs + 86400 * 1000;
       const daySpanSec = 86400;
-
-      // Sample every 5 minutes (300s) across the local day and merge contiguous session codes
       const stepSec = 300;
       const raw = [];
       for (let s = 0; s < daySpanSec; s += stepSec) {
@@ -1951,8 +1943,7 @@
       rangeEl.textContent = getSessionLocalRangeText(todayKey, currentCode);
       nextLineEl.innerHTML = `Next: <strong>${nextMeta.label}</strong> in <strong>${formatCountdown(diffSec)}</strong>`;
 
-      // Anchor week on Monday of current local week (Mon..Sun)
-      const localDow = now.getDay(); // 0=Sun..6=Sat
+      const localDow = now.getDay();
       const diffToMon = localDow === 0 ? -6 : 1 - localDow;
       const mondayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMon);
       const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -1961,7 +1952,6 @@
       const nowPct = Math.min(100, Math.max(0, (nowSecInLocalDay / 86400) * 100));
       const localTimeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
 
-      // Pick key tick labels across the 24h local day
       const tickHours = [0, 6, 12, 18, 23];
       const ticksHtml = tickHours.map(h => `<span>${pad2(h)}:00</span>`).join("");
 
@@ -2017,6 +2007,15 @@
       return Math.abs(n) < 10 ? n.toFixed(3) : n.toFixed(2);
     }
 
+    function formatVolume(vol) {
+      const v = parseFloat(vol);
+      if (isNaN(v) || v <= 0) return "";
+      if (v >= 1e9) return (v / 1e9).toFixed(2) + "B";
+      if (v >= 1e6) return (v / 1e6).toFixed(2) + "M";
+      if (v >= 1e3) return (v / 1e3).toFixed(1) + "K";
+      return v.toFixed(0);
+    }
+
     function renderList(activeDragIdx = -1) {
       listEl.innerHTML = "";
       const liveStockSession = getCurrentEtSessionCode(Date.now());
@@ -2052,6 +2051,11 @@
           ? `Prev: $${formatNum(d.pc)}`
           : "";
 
+        const volFormatted = formatVolume(d.vol);
+        const volText = volFormatted
+          ? (asset.type === "STOCK" ? `Vol: ${volFormatted}` : `Vol: $${volFormatted}`)
+          : "";
+
         const row = document.createElement("div");
         row.className = `item ${activeAlert ? "has-alert" : ""} ${idx === activeDragIdx ? "dragging" : ""}`;
         row.id = `row-${key}`;
@@ -2077,6 +2081,7 @@
           <div class="price-col">
             <div class="price" id="price-${key}">${price ? "$" + formatNum(price) : "---"}</div>
             <div class="prev" id="prev-${key}">${prevText}</div>
+            <div class="vol-sub" id="vol-${key}">${volText}</div>
           </div>
           <div class="chg-col">
             <div class="badge ${badgeClass}" id="badge-${key}">
@@ -2098,12 +2103,14 @@
       const priceEl = document.getElementById(`price-${key}`);
       const badgeEl = document.getElementById(`badge-${key}`);
       const prevEl = document.getElementById(`prev-${key}`);
+      const volEl = document.getElementById(`vol-${key}`);
       const subEl = document.getElementById(`sub-${key}`);
       const tagEl = document.getElementById(`tag-${key}`);
       const pnlEl = document.getElementById(`pnl-${key}`);
       const rowEl = document.getElementById(`row-${key}`);
       if (!priceEl) return;
 
+      const isStock = key.startsWith("STOCK:");
       const price = parseFloat(d.price);
       if (price) {
         priceEl.textContent = "$" + formatNum(price);
@@ -2116,6 +2123,12 @@
       }
 
       if (d.pc && prevEl) prevEl.textContent = "Prev: $" + formatNum(d.pc);
+      if (volEl) {
+        const volFormatted = formatVolume(d.vol);
+        volEl.textContent = volFormatted
+          ? (isStock ? `Vol: ${volFormatted}` : `Vol: $${volFormatted}`)
+          : "";
+      }
       if (d.bid && d.ask && subEl) subEl.textContent = `Bid $${formatNum(d.bid)} / Ask $${formatNum(d.ask)}`;
 
       if (tagEl) {
@@ -2185,14 +2198,15 @@
             const bid = marketData[key]?.bid;
             const ask = marketData[key]?.ask;
             const p = item.p || ((bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : prevPrice);
+            const vol = item.v || item.q || marketData[key]?.vol;
             const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
-            marketData[key] = { ...marketData[key], price: p, pc, chg };
+            marketData[key] = { ...marketData[key], price: p, pc, vol, chg };
             updateRowUI(key, prevPrice);
           });
           scheduleSaveMarketCache();
         }
 
-        if (data.s && (data.bp || data.ap || data.p || data.pc || data.lrc)) {
+        if (data.s && (data.bp || data.ap || data.p || data.pc || data.lrc || data.v || data.q)) {
           if (!stockSyms.includes(data.s)) return;
           const key = `STOCK:${data.s}`;
           const prevPrice = marketData[key]?.price;
@@ -2201,8 +2215,9 @@
           const mid = (bid && ask) ? ((parseFloat(bid) + parseFloat(ask)) / 2) : null;
           const p = data.p || mid || prevPrice;
           const pc = data.pc || data.lrc || marketData[key]?.pc;
+          const vol = data.v || data.q || marketData[key]?.vol;
           const chg = (p && pc) ? ((parseFloat(p) - parseFloat(pc)) / parseFloat(pc)) * 100 : marketData[key]?.chg;
-          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, chg };
+          marketData[key] = { ...marketData[key], price: p, pc, bid, ask, vol, chg };
           updateRowUI(key, prevPrice);
           scheduleSaveMarketCache();
         }
@@ -2231,8 +2246,9 @@
         const prevPrice = marketData[key]?.price;
         const closePrice = parseFloat(d.c);
         const openPrice = parseFloat(d.o);
+        const vol = parseFloat(d.q) || parseFloat(d.v) || marketData[key]?.vol;
         const chg = openPrice ? ((closePrice - openPrice) / openPrice) * 100 : 0;
-        marketData[key] = { ...marketData[key], price: closePrice, chg };
+        marketData[key] = { ...marketData[key], price: closePrice, vol, chg };
         updateRowUI(key, prevPrice);
         scheduleSaveMarketCache();
       };
@@ -2255,10 +2271,12 @@
           const prevPrice = marketData[key]?.price;
           const closePrice = parseFloat(item.lastPrice);
           const chg = parseFloat(item.priceChangePercent);
+          const vol = parseFloat(item.quoteVolume) || parseFloat(item.volume) || marketData[key]?.vol;
           if (!isNaN(closePrice)) {
             marketData[key] = {
               ...marketData[key],
               price: closePrice,
+              vol,
               chg: !isNaN(chg) ? chg : (marketData[key]?.chg ?? 0)
             };
             updateRowUI(key, prevPrice);
@@ -2293,8 +2311,9 @@
         const closePrice = parseFloat(d.c);
         const openPrice = parseFloat(d.o);
         if (isNaN(closePrice)) return;
+        const vol = parseFloat(d.q) || parseFloat(d.v) || marketData[key]?.vol;
         const chg = openPrice ? ((closePrice - openPrice) / openPrice) * 100 : (marketData[key]?.chg ?? 0);
-        marketData[key] = { ...marketData[key], price: closePrice, chg };
+        marketData[key] = { ...marketData[key], price: closePrice, vol, chg };
         updateRowUI(key, prevPrice);
         scheduleSaveMarketCache();
       };
