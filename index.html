@@ -160,6 +160,21 @@
     input.rtl-input { direction: rtl; }
     select { cursor: pointer; }
 
+    .tv-cal-wrap {
+      margin-top: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg);
+      min-height: 360px;
+      direction: ltr;
+    }
+    .tv-cal-toolbar {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+      background: var(--card); direction: rtl; flex-wrap: wrap;
+    }
+
     .sub-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
     .sub-title { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
     .sub-list { display: flex; flex-direction: column; gap: 6px; direction: ltr; }
@@ -419,32 +434,33 @@
     </div>
 
     <div id="viewAgenda" style="display:none;">
-      <div style="font-size:12px; color:var(--muted);">أضف بيانات مالية أو أحداث الأسبوع (مثل CPI أو FOMC أو NFP) ليظهر توقيتها مسبقاً:</div>
-      <div class="row-input">
-        <input type="text" class="rtl-input" id="agendaTitleInput" placeholder="اسم الحدث (مثال: CPI / FOMC)" onkeydown="if(event.key==='Enter') addAgendaEvent()" />
-        <input type="date" id="agendaDateInput" />
-        <input type="time" id="agendaTimeInput" />
-        <select id="agendaTzInput">
-          <option value="ET">توقيت ET (نيويورك)</option>
-          <option value="LOCAL">توقيتي المحلي</option>
+      <div class="tv-cal-toolbar">
+        <span style="font-size:12px; color:var(--muted);">تقويم TradingView الاقتصادي (الأحداث المؤثرة):</span>
+        <select id="calImportanceFilter" onchange="renderTvEconomicCalendar()" style="padding:5px 8px; font-size:12px;">
+          <option value="1">مهم جداً فقط (High)</option>
+          <option value="0,1">مهم ومتوسط (Medium + High)</option>
+          <option value="-1,0,1">الكل (All)</option>
         </select>
       </div>
-      <div class="row-input">
-        <input type="text" class="rtl-input" id="agendaNoteInput" placeholder="ملاحظة مختصرة (اختياري)" onkeydown="if(event.key==='Enter') addAgendaEvent()" />
-        <button class="btn btn-accent" onclick="addAgendaEvent()">+ حفظ في الأجندة</button>
-      </div>
+      <div class="tv-cal-wrap" id="tvEconomicCalendarContainer"></div>
 
       <div class="sub-section">
         <div class="sub-title">
-          <span>أحداث الأسبوع المسجلة</span>
+          <span>تذكيرات شخصية إضافية (اختياري)</span>
           <span id="agendaCount">0</span>
         </div>
-        <div class="sub-list" id="agendaList"></div>
+        <div class="row-input">
+          <input type="text" class="rtl-input" id="agendaTitleInput" placeholder="تذكير خاص بك (اختياري)" onkeydown="if(event.key==='Enter') addAgendaEvent()" />
+          <input type="date" id="agendaDateInput" />
+          <input type="time" id="agendaTimeInput" />
+          <button class="btn btn-accent" onclick="addAgendaEvent()">+ حفظ</button>
+        </div>
+        <div class="sub-list" id="agendaList" style="margin-top:8px;"></div>
       </div>
     </div>
 
     <div id="viewBackup" style="display:none;">
-      <div style="font-size:12px; color:var(--muted);">صدّر بياناتك (قائمة المراقبة، المحفظة، التنبيهات، أجندة الأسبوع، الإعدادات) إلى ملف JSON لحفظها أو نقلها لجهاز آخر:</div>
+      <div style="font-size:12px; color:var(--muted);">صدّر بياناتك (قائمة المراقبة، المحفظة، التنبيهات، الإعدادات) إلى ملف JSON لحفظها أو نقلها لجهاز آخر:</div>
       <div class="backup-box" id="backupStatsText"></div>
       <div class="backup-actions">
         <button class="btn btn-accent" onclick="exportBackupJson()">⬇️ تصدير نسخة احتياطية (JSON)</button>
@@ -777,6 +793,9 @@
       const isDark = theme === "dark";
       themeBtn.textContent = isDark ? "🌙 Dark" : "☀️ Light";
       document.getElementById("themeMeta").setAttribute("content", isDark ? "#161a1e" : "#f5f7fa");
+      if (document.getElementById("viewAgenda")?.style.display !== "none") {
+        renderTvEconomicCalendar();
+      }
       if (tvModalOpen) {
         mountTradingViewFull(currentTvSymbol);
       }
@@ -829,10 +848,47 @@
         populateSelect("alertAssetSelect");
         renderAlerts();
       } else if (tabName === "agenda") {
+        renderTvEconomicCalendar();
         renderAgenda();
       } else if (tabName === "backup") {
         updateBackupStats();
       }
+    }
+
+    function renderTvEconomicCalendar() {
+      const container = document.getElementById("tvEconomicCalendarContainer");
+      if (!container) return;
+
+      const impVal = document.getElementById("calImportanceFilter")?.value || "1";
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+
+      container.innerHTML = "";
+
+      const widgetHolder = document.createElement("div");
+      widgetHolder.className = "tradingview-widget-container";
+      widgetHolder.style.width = "100%";
+      widgetHolder.style.height = "350px";
+
+      const innerDiv = document.createElement("div");
+      innerDiv.className = "tradingview-widget-container__widget";
+      widgetHolder.appendChild(innerDiv);
+
+      const scriptEl = document.createElement("script");
+      scriptEl.type = "text/javascript";
+      scriptEl.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+      scriptEl.async = true;
+      scriptEl.text = JSON.stringify({
+        colorTheme: isDark ? "dark" : "light",
+        isTransparent: false,
+        width: "100%",
+        height: 350,
+        locale: "en",
+        importanceFilter: impVal,
+        currencyFilter: "USD"
+      });
+
+      widgetHolder.appendChild(scriptEl);
+      container.appendChild(widgetHolder);
     }
 
     function pad2(n) {
@@ -870,11 +926,9 @@
       const title = document.getElementById("agendaTitleInput").value.trim();
       const date = document.getElementById("agendaDateInput").value;
       const time = document.getElementById("agendaTimeInput").value || "08:30";
-      const tz = document.getElementById("agendaTzInput").value || "ET";
-      const note = document.getElementById("agendaNoteInput").value.trim();
 
       if (!title || !date) {
-        showToast("⚠️ يرجى إدخال اسم الحدث والتاريخ");
+        showToast("⚠️ يرجى إدخال اسم التذكير والتاريخ");
         return;
       }
 
@@ -882,13 +936,10 @@
         id: Date.now(),
         title,
         date,
-        time,
-        tz,
-        note
+        time
       });
 
       document.getElementById("agendaTitleInput").value = "";
-      document.getElementById("agendaNoteInput").value = "";
       saveAgenda();
     }
 
@@ -906,7 +957,7 @@
       container.innerHTML = "";
 
       if (!agendaEvents.length) {
-        container.innerHTML = `<div style="font-size:12px; color:var(--muted); text-align:center; padding:8px;">لا توجد أحداث مسجلة في أجندة الأسبوع</div>`;
+        container.innerHTML = `<div style="font-size:12px; color:var(--muted); text-align:center; padding:6px;">لا توجد تذكيرات إضافية</div>`;
         return;
       }
 
@@ -916,9 +967,7 @@
         row.innerHTML = `
           <div>
             <strong>${ev.title}</strong>
-            <div style="color:var(--muted); font-size:11px; margin-top:2px;">
-              ${ev.date} • ${ev.time} (${ev.tz === "ET" ? "ET" : "Local"})${ev.note ? " — " + ev.note : ""}
-            </div>
+            <div style="color:var(--muted); font-size:11px; margin-top:2px;">${ev.date} • ${ev.time}</div>
           </div>
           <button class="btn btn-sm" style="color:var(--red); border-color:var(--red);" onclick="deleteAgendaEvent(${ev.id})">حذف</button>
         `;
@@ -932,7 +981,6 @@
       const todayKey = formatDateKey(et.year, et.month, et.date);
       const lines = [];
 
-      // Look ahead 7 days (covers rest of current week and upcoming week early notice)
       for (let i = 0; i <= 7; i++) {
         const k = addDaysToDateKey(todayKey, i);
         const ev = getMarketEventForDate(k);
@@ -956,15 +1004,14 @@
         }
       }
 
-      // Show upcoming custom agenda events within next 7 days
       agendaEvents.forEach(ev => {
         if (!ev.date) return;
         if (ev.date >= todayKey && ev.date <= addDaysToDateKey(todayKey, 7)) {
           const whenLabel = ev.date === todayKey ? `اليوم ${ev.time}` : `${ev.date} ${ev.time}`;
           lines.push(`
             <div class="cal-line">
-              <span><span class="cal-badge-event">حدث أسبوعي:</span> ${ev.title}${ev.note ? " (" + ev.note + ")" : ""}</span>
-              <span style="color:var(--muted); direction:ltr;">${whenLabel} (${ev.tz === "ET" ? "ET" : "Local"})</span>
+              <span><span class="cal-badge-event">تذكير:</span> ${ev.title}</span>
+              <span style="color:var(--muted); direction:ltr;">${whenLabel}</span>
             </div>
           `);
         }
@@ -988,7 +1035,7 @@
         • الأصول في القائمة: <strong>${assets.length}</strong><br>
         • المراكز المفتوحة في المحفظة: <strong>${posCount}</strong><br>
         • التنبيهات المسجلة: <strong>${alerts.length}</strong><br>
-        • أحداث أجندة الأسبوع: <strong>${agendaEvents.length}</strong>
+        • التذكيرات الإضافية: <strong>${agendaEvents.length}</strong>
       `;
     }
 
@@ -1542,7 +1589,6 @@
       const secOfDay = et.hour * 3600 + et.minute * 60 + et.second;
       const todayKey = formatDateKey(et.year, et.month, et.date);
 
-      // Scan up to 10 days ahead to find the next valid session transition respecting holidays & early closes
       for (let offset = 0; offset <= 10; offset++) {
         const dk = addDaysToDateKey(todayKey, offset);
         const dow = getDayOfWeekFromKey(dk);
